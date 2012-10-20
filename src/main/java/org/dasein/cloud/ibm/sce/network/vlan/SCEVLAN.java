@@ -22,12 +22,16 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
 import org.dasein.cloud.ibm.sce.SCEMethod;
 import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.network.IPVersion;
+import org.dasein.cloud.network.NICCreateOptions;
 import org.dasein.cloud.network.NetworkInterface;
+import org.dasein.cloud.network.RoutingTable;
 import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANSupport;
@@ -39,21 +43,47 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Locale;
-import java.util.UUID;
 
 /**
- * [Class Documentation]
+ * Support for IBM networks in SmartCloud.
  * <p>Created by George Reese: 7/17/12 7:52 PM</p>
  * @author George Reese
- * @version 2012.02 initial version
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @version 2012.09 updates for the 2012.09 object model
+ * @since 2012.04
  */
 public class SCEVLAN implements VLANSupport {
     private SCE provider;
 
     public SCEVLAN(SCE provider) { this.provider = provider; }
+
+    @Override
+    public void addRouteToAddress(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String address) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
+    public void addRouteToGateway(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String gatewayId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
+    public void addRouteToNetworkInterface(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String nicId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
+    public void addRouteToVirtualMachine(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String vmId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
+    public boolean allowsNewNetworkInterfaceCreation() throws CloudException, InternalException {
+        return false;
+    }
 
     @Override
     public boolean allowsNewVlanCreation() throws CloudException, InternalException {
@@ -66,13 +96,53 @@ public class SCEVLAN implements VLANSupport {
     }
 
     @Override
-    public Subnet createSubnet(String cidr, String inProviderVlanId, String name, String description) throws CloudException, InternalException {
+    public void assignRoutingTableToSubnet(@Nonnull String subnetId, @Nonnull String routingTableId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
+    public void assignRoutingTableToVlan(@Nonnull String vlanId, @Nonnull String routingTableId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
+    public void attachNetworkInterface(@Nonnull String nicId, @Nonnull String vmId, int index) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Network interfaces are not supported");
+    }
+
+    @Override
+    public String createInternetGateway(@Nonnull String forVlanId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Internet gateways are not supported");
+    }
+
+    @Override
+    public @Nonnull String createRoutingTable(@Nonnull String forVlanId, @Nonnull String name, @Nonnull String description) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
+    public @Nonnull NetworkInterface createNetworkInterface(@Nonnull NICCreateOptions options) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Network interfaces are not supported");
+    }
+
+    @Override
+    public @Nonnull Subnet createSubnet(@Nonnull String cidr, @Nonnull String inProviderVlanId, @Nonnull String name, @Nonnull String description) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Cannot create subnets");
     }
 
     @Override
-    public VLAN createVlan(String cidr, String name, String description, String domainName, String[] dnsServers, String[] ntpServers) throws CloudException, InternalException {
+    public @Nonnull VLAN createVlan(@Nonnull String cidr, @Nonnull String name, @Nonnull String description, @Nonnull String domainName, @Nonnull String[] dnsServers, @Nonnull String[] ntpServers) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Cannot create VLANs");
+    }
+
+    @Override
+    public void detachNetworkInterface(@Nonnull String nicId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Network interfaces are not supported");
+    }
+
+    @Override
+    public int getMaxNetworkInterfaceCount() throws CloudException, InternalException {
+        return -2;
     }
 
     @Override
@@ -81,23 +151,48 @@ public class SCEVLAN implements VLANSupport {
     }
 
     @Override
-    public String getProviderTermForNetworkInterface(Locale locale) {
+    public @Nonnull String getProviderTermForNetworkInterface(@Nonnull Locale locale) {
         return "network interface";
     }
 
     @Override
-    public String getProviderTermForSubnet(Locale locale) {
+    public @Nonnull String getProviderTermForSubnet(@Nonnull Locale locale) {
         return "subnet";
     }
 
     @Override
-    public String getProviderTermForVlan(Locale locale) {
+    public @Nonnull String getProviderTermForVlan(@Nonnull Locale locale) {
         return "VLAN";
+    }
+
+    @Override
+    public NetworkInterface getNetworkInterface(@Nonnull String nicId) throws CloudException, InternalException {
+        return null;
+    }
+
+    @Override
+    public RoutingTable getRoutingTableForSubnet(@Nonnull String subnetId) throws CloudException, InternalException {
+        return null;
+    }
+
+    @Override
+    public @Nonnull Requirement getRoutingTableSupport() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public RoutingTable getRoutingTableForVlan(@Nonnull String vlanId) throws CloudException, InternalException {
+        return null;
     }
 
     @Override
     public Subnet getSubnet(@Nonnull String subnetId) throws CloudException, InternalException {
         return null;
+    }
+
+    @Override
+    public @Nonnull Requirement getSubnetSupport() throws CloudException, InternalException {
+        return Requirement.NONE;
     }
 
     @Override
@@ -125,6 +220,11 @@ public class SCEVLAN implements VLANSupport {
             }
         }
         return null;
+    }
+
+    @Override
+    public boolean isNetworkInterfaceSupportEnabled() throws CloudException, InternalException {
+        return false;
     }
 
     @Override
@@ -158,13 +258,43 @@ public class SCEVLAN implements VLANSupport {
     }
 
     @Override
-    public @Nonnull Iterable<NetworkInterface> listNetworkInterfaces(@Nonnull String forVmId) throws CloudException, InternalException {
+    public Collection<String> listFirewallIdsForNIC(@Nonnull String nicId) throws CloudException, InternalException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public @Nonnull Iterable<NetworkInterface> listNetworkInterfaces() throws CloudException, InternalException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public @Nonnull Iterable<NetworkInterface> listNetworkInterfacesForVM(@Nonnull String forVmId) throws CloudException, InternalException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public @Nonnull Iterable<NetworkInterface> listNetworkInterfacesInSubnet(@Nonnull String subnetId) throws CloudException, InternalException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public @Nonnull Iterable<NetworkInterface> listNetworkInterfacesInVLAN(@Nonnull String vlanId) throws CloudException, InternalException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public @Nonnull Iterable<RoutingTable> listRoutingTables(@Nonnull String inVlanId) throws CloudException, InternalException {
         return Collections.emptyList();
     }
 
     @Override
     public @Nonnull Iterable<Subnet> listSubnets(@Nonnull String inVlanId) throws CloudException, InternalException {
         return Collections.emptyList();
+    }
+
+    @Override
+    public @Nonnull Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
+        return Collections.singletonList(IPVersion.IPV4);
     }
 
     @Override
@@ -196,6 +326,26 @@ public class SCEVLAN implements VLANSupport {
     }
 
     @Override
+    public void removeInternetGateway(@Nonnull String forVlanId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Internet gateways are not supported");
+    }
+
+    @Override
+    public void removeNetworkInterface(@Nonnull String nicId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Network interfaces are not supported");
+    }
+
+    @Override
+    public void removeRoute(@Nonnull String inRoutingTableId, @Nonnull String destinationCidr) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
+    public void removeRoutingTable(@Nonnull String routingTableId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Routing tables are not supported");
+    }
+
+    @Override
     public void removeSubnet(String providerSubnetId) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Cannot remove subnets");
     }
@@ -206,7 +356,12 @@ public class SCEVLAN implements VLANSupport {
     }
 
     @Override
-    public boolean supportsVlansWithSubnets() throws CloudException, InternalException {
+    public boolean supportsInternetGatewayCreation() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsRawAddressRouting() throws CloudException, InternalException {
         return false;
     }
 

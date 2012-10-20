@@ -35,8 +35,8 @@ import java.text.SimpleDateFormat;
  * Provider class for integration with the IBM SmartCloud platform.
  * <p>Created by George Reese: 7/16/12 7:32 PM</p>
  * @author George Reese
- * @version 2012.02 initial version
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class SCE extends AbstractCloud {
     static private @Nonnull String getLastItem(@Nonnull String name) {

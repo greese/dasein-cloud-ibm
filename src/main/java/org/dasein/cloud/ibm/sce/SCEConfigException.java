@@ -23,11 +23,11 @@ import org.dasein.cloud.InternalException;
 import javax.annotation.Nonnull;
 
 /**
- * [Class Documentation]
+ * Error configuring Dasein Cloud for SmartCloud.
  * <p>Created by George Reese: 7/16/12 7:45 PM</p>
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class SCEConfigException extends InternalException {
     public SCEConfigException(@Nonnull String message) {

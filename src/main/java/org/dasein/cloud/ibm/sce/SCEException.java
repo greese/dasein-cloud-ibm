@@ -22,12 +22,11 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 
 /**
- * [Class Documentation]
+ * Base exception for SmartCloud interaction.
  * <p>Created by George Reese: 7/16/12 7:46 PM</p>
- *
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class SCEException extends CloudException {
     public SCEException(CloudErrorType type, int code, String message, String details) {

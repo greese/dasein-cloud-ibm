@@ -28,12 +28,11 @@ import org.dasein.cloud.ibm.sce.compute.vm.SCEVirtualMachine;
 import javax.annotation.Nonnull;
 
 /**
- * [Class Documentation]
+ * Compute services support for IBM SmartCloud.
  * <p>Created by George Reese: 7/17/12 1:04 PM</p>
- *
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class SCECompute extends AbstractComputeServices {
     private SCE provider;

@@ -25,12 +25,11 @@ import org.dasein.cloud.identity.AbstractIdentityServices;
 import javax.annotation.Nonnull;
 
 /**
- * [Class Documentation]
+ * Identity and access support for IBM SmartCloud.
  * <p>Created by George Reese: 7/17/12 3:38 PM</p>
- *
  * @author George Reese
- * @version 2012.02 (bugzid: [FOGBUGZID])
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class SCEIdentity extends AbstractIdentityServices {
     private SCE provider;

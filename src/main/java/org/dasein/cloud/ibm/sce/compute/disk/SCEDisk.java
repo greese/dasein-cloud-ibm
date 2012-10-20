@@ -23,16 +23,22 @@ import org.apache.http.message.BasicNameValuePair;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
+import org.dasein.cloud.compute.VolumeCreateOptions;
+import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeSupport;
+import org.dasein.cloud.compute.VolumeType;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
 import org.dasein.cloud.ibm.sce.SCEMethod;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.util.CalendarWrapper;
+import org.dasein.util.uom.storage.Gigabyte;
+import org.dasein.util.uom.storage.Storage;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -48,8 +54,9 @@ import java.util.Locale;
  * Implements disk/volume management according to the Dasein Cloud API for IBM SmartCloud storage.
  * <p>Created by George Reese: 7/17/12 3:46 PM</p>
  * @author George Reese
- * @version 2012.02 initial version
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @version 2012.09 updated to new object model (George Reese)
+ * @since 2012.04
  */
 public class SCEDisk implements VolumeSupport {
     private SCE provider;
@@ -204,19 +211,116 @@ public class SCEDisk implements VolumeSupport {
         return offering;
     }
 
+    private SCEOffering findOffering(@Nonnull String productId) throws InternalException, CloudException {
+        SCEOffering offering;
+
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        SCEMethod method = new SCEMethod(provider);
+
+        Document xml = method.getAsXML("offerings/storage");
+
+        if( xml == null ) {
+            throw new CloudException("No storage offerings exist");
+        }
+        NodeList nodes = xml.getElementsByTagName("Offerings");
+
+        for( int i=0; i<nodes.getLength(); i++ ) {
+            Node item = nodes.item(i);
+
+            if( item.hasChildNodes() ) {
+                NodeList attrs = item.getChildNodes();
+                String id = null, format = null;
+                int[] sizes = new int[0];
+
+                for( int j=0; j<attrs.getLength(); j++ ) {
+                    Node attr = attrs.item(j);
+                    String n = attr.getNodeName();
+
+                    if( n.equalsIgnoreCase("ID") ) {
+                        id = attr.getFirstChild().getNodeValue().trim();
+                    }
+                    else if( n.equalsIgnoreCase("SupportedSizes") ) {
+                        String s = attr.getFirstChild().getNodeValue().trim();
+                        String[] parts;
+
+                        if( s.contains(",") ) {
+                            parts = s.split(",");
+                        }
+                        else {
+                            parts = new String[] { s };
+                        }
+                        sizes = new int[parts.length];
+                        for( int k=0; k<parts.length; k++ ) {
+                            sizes[k] = Integer.parseInt(parts[k].trim());
+                        }
+                    }
+                    else if( n.equalsIgnoreCase("SupportedFormats") && attr.hasChildNodes() ) {
+                        NodeList formats = attr.getChildNodes();
+
+                        for( int k=0; k<formats.getLength(); k++ ) {
+                            Node fmt = formats.item(k);
+
+                            if( fmt.getNodeName().equalsIgnoreCase("Format") && fmt.hasChildNodes() ) {
+                                NodeList fa = fmt.getChildNodes();
+
+                                for( int l=0; l<fa.getLength(); l++ ) {
+                                    Node fan = fa.item(l);
+
+                                    if( fan.getNodeName().equalsIgnoreCase("ID") && fan.hasChildNodes() ) {
+                                        format = fan.getFirstChild().getNodeValue().trim();
+                                        if( !format.equalsIgnoreCase("RAW") ) {
+                                            format = null;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if( id == null || !id.equals(productId) ) {
+                    continue;
+                }
+                offering = new SCEOffering();
+                offering.format = format;
+                offering.offeringId = id;
+                offering.size = sizes[0];
+                return offering;
+            }
+        }
+        return null;
+    }
+
     @Override
     public String create(String fromSnapshot, int sizeInGb, String inZone) throws InternalException, CloudException {
+        return createVolume(VolumeCreateOptions.getInstance(new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "Volume" + System.currentTimeMillis(), "Volume" + System.currentTimeMillis()));
+    }
+
+    @Override
+    public @Nonnull String createVolume(@Nonnull VolumeCreateOptions options) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
             throw new SCEConfigException("No context was configured for this request");
         }
         ArrayList<NameValuePair> parameters = new ArrayList<NameValuePair>();
+        String fromSnapshot = options.getSnapshotId();
 
-        parameters.add(new BasicNameValuePair("name", "Volume" + System.currentTimeMillis()));
+
+        parameters.add(new BasicNameValuePair("name", options.getName()));
         if( fromSnapshot == null ) {
-            SCEOffering offering = findOffering(sizeInGb);
+            String productId = options.getVolumeProductId();
+            SCEOffering offering;
 
+            if( productId != null ) {
+                offering = findOffering(productId);
+            }
+            else {
+                offering = findOffering(options.getVolumeSize().intValue());
+            }
             parameters.add(new BasicNameValuePair("location", ctx.getRegionId()));
             parameters.add(new BasicNameValuePair("offeringID", offering.offeringId));
             parameters.add(new BasicNameValuePair("format", offering.format));
@@ -290,12 +394,27 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
+    public int getMaximumVolumeCount() throws InternalException, CloudException {
+        return -2;
+    }
+
+    @Override
+    public Storage<Gigabyte> getMaximumVolumeSize() throws InternalException, CloudException {
+        return new Storage<Gigabyte>(5000, Storage.GIGABYTE);
+    }
+
+    @Override
+    public @Nonnull Storage<Gigabyte> getMinimumVolumeSize() throws InternalException, CloudException {
+        return new Storage<Gigabyte>(1, Storage.GIGABYTE);
+    }
+
+    @Override
     public @Nonnull String getProviderTermForVolume(@Nonnull Locale locale) {
         return "disk";
     }
 
     @Override
-    public ExtendedVolume getVolume(String volumeId) throws InternalException, CloudException {
+    public ExtendedVolume getVolume(@Nonnull String volumeId) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -322,6 +441,16 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
+    public @Nonnull Requirement getVolumeProductRequirement() throws InternalException, CloudException {
+        return Requirement.REQUIRED;
+    }
+
+    @Override
+    public boolean isVolumeSizeDeterminedByProduct() throws InternalException, CloudException {
+        return true;
+    }
+
+    @Override
     public Iterable<String> listPossibleDeviceIds(Platform platform) throws InternalException, CloudException {
         ArrayList<String> list = new ArrayList<String>();
 
@@ -340,6 +469,85 @@ public class SCEDisk implements VolumeSupport {
             list.add("/dev/sdj");
         }
         return list;
+    }
+
+    @Override
+    public @Nonnull Iterable<VolumeProduct> listVolumeProducts() throws InternalException, CloudException {
+        ArrayList<VolumeProduct> products = new ArrayList<VolumeProduct>();
+
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        SCEMethod method = new SCEMethod(provider);
+
+        Document xml = method.getAsXML("offerings/storage");
+
+        if( xml == null ) {
+            throw new CloudException("No storage offerings exist");
+        }
+        NodeList nodes = xml.getElementsByTagName("Offerings");
+
+        for( int i=0; i<nodes.getLength(); i++ ) {
+            Node item = nodes.item(i);
+
+            if( item.hasChildNodes() ) {
+                NodeList attrs = item.getChildNodes();
+                String id = null, format = null;
+                int[] sizes = new int[0];
+
+                for( int j=0; j<attrs.getLength(); j++ ) {
+                    Node attr = attrs.item(j);
+                    String n = attr.getNodeName();
+
+                    if( n.equalsIgnoreCase("ID") ) {
+                        id = attr.getFirstChild().getNodeValue().trim();
+                    }
+                    else if( n.equalsIgnoreCase("SupportedSizes") ) {
+                        String s = attr.getFirstChild().getNodeValue().trim();
+                        String[] parts;
+
+                        if( s.contains(",") ) {
+                            parts = s.split(",");
+                        }
+                        else {
+                            parts = new String[] { s };
+                        }
+                        sizes = new int[parts.length];
+                        for( int k=0; k<parts.length; k++ ) {
+                            sizes[k] = Integer.parseInt(parts[k].trim());
+                        }
+                    }
+                    else if( n.equalsIgnoreCase("SupportedFormats") && attr.hasChildNodes() ) {
+                        NodeList formats = attr.getChildNodes();
+
+                        for( int k=0; k<formats.getLength(); k++ ) {
+                            Node fmt = formats.item(k);
+
+                            if( fmt.getNodeName().equalsIgnoreCase("Format") && fmt.hasChildNodes() ) {
+                                NodeList fa = fmt.getChildNodes();
+
+                                for( int l=0; l<fa.getLength(); l++ ) {
+                                    Node fan = fa.item(l);
+
+                                    if( fan.getNodeName().equalsIgnoreCase("ID") && fan.hasChildNodes() ) {
+                                        format = fan.getFirstChild().getNodeValue().trim();
+                                        if( !format.equalsIgnoreCase("RAW") ) {
+                                            format = null;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if( sizes.length > 0 && format != null ) {
+                    products.add(VolumeProduct.getInstance(id, id + " - " + format, id + " - " + format + " - " + sizes[0], VolumeType.HDD, new Storage<Gigabyte>(sizes[0], Storage.GIGABYTE)));
+                }
+            }
+        }
+        return products;
     }
 
     @Override
@@ -447,7 +655,7 @@ public class SCEDisk implements VolumeSupport {
                 volume.setProviderDataCenterId(volume.getProviderRegionId());
             }
             else if( nodeName.equalsIgnoreCase("Size") && attr.hasChildNodes()) {
-                volume.setSizeInGigabytes(Integer.parseInt(attr.getFirstChild().getNodeValue().trim()));
+                volume.setSize(new Storage<Gigabyte>(Integer.parseInt(attr.getFirstChild().getNodeValue().trim()), Storage.GIGABYTE));
             }
             else if( nodeName.equalsIgnoreCase("State") && attr.hasChildNodes()) {
                 String status = attr.getFirstChild().getNodeValue().trim();

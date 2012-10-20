@@ -39,8 +39,8 @@ import java.util.Locale;
  * Support for the SmartCloud locations request.
  * <p>Created by George Reese: 7/16/12 10:12 PM</p>
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class Locations implements DataCenterServices {
     private SCE provider;
@@ -76,29 +76,40 @@ public class Locations implements DataCenterServices {
 
     @Override
     public ExtendedRegion getRegion(String providerRegionId) throws InternalException, CloudException {
-        ProviderContext ctx = provider.getContext();
+        try {
+            ProviderContext ctx = provider.getContext();
 
-        if( ctx == null ) {
-            throw new SCEConfigException("No context was configured for this request");
-        }
-        SCEMethod method = new SCEMethod(provider);
+            if( ctx == null ) {
+                throw new SCEConfigException("No context was configured for this request");
+            }
+            SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/locations/" + providerRegionId);
+            Document xml = method.getAsXML("/locations/" + providerRegionId);
 
-        if( xml == null ) {
+            if( xml == null ) {
+                return null;
+            }
+            NodeList locations = xml.getElementsByTagName("Location");
+
+            for( int i=0; i<locations.getLength(); i++ ) {
+                Node item = locations.item(i);
+                ExtendedRegion region = toRegion(ctx, item);
+
+                if( region != null ) {
+                    return region;
+                }
+            }
             return null;
         }
-        NodeList locations = xml.getElementsByTagName("Location");
-
-        for( int i=0; i<locations.getLength(); i++ ) {
-            Node item = locations.item(i);
-            ExtendedRegion region = toRegion(ctx, item);
-
-            if( region != null ) {
-                return region;
+        catch( SCEException e ) {
+            // IBM incomprehensibly throws a 500 exception if it gets an invalid region id, so this verifies the situation
+            for( Region r : listRegions() ) {
+                if( r.getProviderRegionId().equals(providerRegionId) ) {
+                    return (ExtendedRegion)r;
+                }
             }
+            return null;
         }
-        return null;
     }
 
     @Override

@@ -72,8 +72,8 @@ import java.util.Properties;
  * IBM SmartCloud.
  * <p>Created by George Reese: 7/16/12 7:38 PM</p>
  * @author George Reese
- * @version 2012.02 initial version
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class SCEMethod {
     private String endpoint;

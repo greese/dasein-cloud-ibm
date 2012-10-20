@@ -21,12 +21,11 @@ package org.dasein.cloud.ibm.sce.compute.disk;
 import org.dasein.cloud.compute.Volume;
 
 /**
- * [Class Documentation]
+ * Volume with IBM attributes.
  * <p>Created by George Reese: 7/19/12 10:09 AM</p>
- *
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class ExtendedVolume extends Volume {
     public String getRealState() {

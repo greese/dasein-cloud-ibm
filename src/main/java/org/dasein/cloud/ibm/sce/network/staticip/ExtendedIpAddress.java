@@ -21,12 +21,11 @@ package org.dasein.cloud.ibm.sce.network.staticip;
 import org.dasein.cloud.network.IpAddress;
 
 /**
- * [Class Documentation]
+ * Extended IP attributes for IBM SmartCloud.
  * <p>Created by George Reese: 7/19/12 11:07 AM</p>
- *
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class ExtendedIpAddress extends IpAddress {
     public String getRealState() {

@@ -22,7 +22,9 @@ import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
@@ -48,8 +50,9 @@ import java.util.UUID;
  * SSH key support in the IBM SmartCloud.
  * <p>Created by George Reese: 7/17/12 3:38 PM</p>
  * @author George Reese
- * @version 2012.02 initial version
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @version 2012.09 updated for 2012.09 object model (George Reese)
+ * @since 2012.04
  */
 public class SSHKeys implements ShellKeySupport {
     private SCE provider;
@@ -116,6 +119,11 @@ public class SSHKeys implements ShellKeySupport {
     }
 
     @Override
+    public Requirement getKeyImportSupport() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
     public SSHKeypair getKeypair(@Nonnull String providerId) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
@@ -145,6 +153,12 @@ public class SSHKeys implements ShellKeySupport {
     @Override
     public @Nonnull String getProviderTermForKeypair(@Nonnull Locale locale) {
         return "public key";
+    }
+
+    @Override
+    public @Nonnull SSHKeypair importKeypair(@Nonnull String name, @Nonnull String publicKey) throws InternalException, CloudException {
+        // TODO: support import of keyspairs. Remember to change the requirement to optional
+        throw new OperationNotSupportedException("Not currently supported in Dasein Cloud");
     }
 
     @Override

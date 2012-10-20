@@ -20,7 +20,7 @@
 
     <groupId>org.dasein</groupId>
     <artifactId>dasein-cloud-ibm</artifactId>
-    <version>2012.04.2-SNAPSHOT</version>
+    <version>2012.09-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Dasein Cloud IBM</name>
@@ -46,9 +46,9 @@
     </organization>
 
     <scm>
-        <connection>scm:svn:https://dasein-cloud.svn.sourceforge.net/svnroot/dasein-cloud/trunk/dasein-cloud-ibm</connection>
-        <developerConnection>scm:svn:https://dasein-cloud.svn.sourceforge.net/svnroot/dasein-cloud/trunk/dasein-cloud-ibm</developerConnection>
-        <url>https://dasein-cloud.svn.sourceforge.net/svnroot/dasein-cloud/trunk/dasein-cloud-ibm</url>
+        <connection>scm:git:git://github.com/greese/dasein-cloud-ibm.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/greese/dasein-cloud-ibm.git</developerConnection>
+        <url>http://github.com/greese/dasein-cloud-ibm</url>
     </scm>
 
     <parent>
@@ -58,24 +58,25 @@
     </parent>
 
     <dependencies>
+        <!-- Compile -->
         <dependency>
             <groupId>org.dasein</groupId>
             <artifactId>dasein-cloud-core</artifactId>
-            <version>2012.04.1</version>
+            <version>2012.09</version>
             <scope>compile</scope>
             <optional>false</optional>
         </dependency>
         <dependency>
             <groupId>org.dasein</groupId>
             <artifactId>dasein-cloud-test</artifactId>
-            <version>2012.04.2</version>
+            <version>2012.09.2</version>
             <scope>test</scope>
             <optional>false</optional>
         </dependency>
         <dependency>
             <groupId>org.dasein</groupId>
             <artifactId>dasein-util</artifactId>
-            <version>2012.02</version>
+            <version>2012.08</version>
             <scope>compile</scope>
             <optional>false</optional>
         </dependency>
@@ -85,15 +86,9 @@
             <version>4.2</version>
         </dependency>
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.8.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
-            <version>1.2.16</version>
+            <version>1.2.17</version>
             <scope>compile</scope>
             <optional>false</optional>
         </dependency>
@@ -102,6 +97,14 @@
             <artifactId>json</artifactId>
             <version>20090211</version>
             <scope>compile</scope>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.9</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -182,9 +185,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
                 <version>2.1</version>
-                <configuration>
-                    <tagBase>https://dasein-cloud.svn.sourceforge.net/svnroot/dasein-cloud/tags/dasein-cloud-ibm</tagBase>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -247,7 +247,7 @@
 
                     </systemProperties>
                     <includes>
-                      <!-- <include>**/SCETestSuite.java</include> -->
+                      <include>**/SCETestSuite.java</include>
                     </includes>
                 </configuration>
             </plugin>

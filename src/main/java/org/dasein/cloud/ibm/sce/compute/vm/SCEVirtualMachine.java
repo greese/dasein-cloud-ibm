@@ -25,11 +25,13 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.MachineImageState;
 import org.dasein.cloud.compute.Platform;
+import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VirtualMachineSupport;
@@ -43,6 +45,9 @@ import org.dasein.cloud.ibm.sce.identity.keys.SSHKeys;
 import org.dasein.cloud.identity.SSHKeypair;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.util.CalendarWrapper;
+import org.dasein.util.uom.storage.Gigabyte;
+import org.dasein.util.uom.storage.Megabyte;
+import org.dasein.util.uom.storage.Storage;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -62,18 +67,14 @@ import java.util.Map;
  * Implementation of the Dasein Cloud virtual machine support for IBM SmartCloud.
  * <p>Created by George Reese: 7/16/12 7:37 PM</p>
  * @author George Reese
- * @version 2012.02 initial version
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @version 2012.09 updated with support for new 2012.09 object model (George Reese)
+ * @since 2012.04
  */
 public class SCEVirtualMachine implements VirtualMachineSupport {
     private SCE provider;
 
     public SCEVirtualMachine(SCE provider) { this.provider = provider; }
-
-    @Override
-    public void boot(@Nonnull String vmId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Starting/stopping VMs is not supported in this cloud");
-    }
 
     @Override
     public @Nonnull VirtualMachine clone(@Nonnull String vmId, @Nonnull String intoDcId, @Nonnull String name, @Nonnull String description, boolean powerOn, @Nullable String... firewallIds) throws InternalException, CloudException {
@@ -83,7 +84,7 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
         if( vm == null ) {
             throw new CloudException("No such virtual machine: " + vmId);
         }
-        VirtualMachineProduct prd = vm.getProduct();
+        VirtualMachineProduct prd = getProduct(vm.getProductId());
 
         if( prd == null ) {
             throw new CloudException("Unknown product associated with VM");
@@ -160,10 +161,15 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
+    public int getMaximumVirtualMachineCount() throws CloudException, InternalException {
+        return -2;
+    }
+
+    @Override
     public VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {
         for( Architecture architecture : Architecture.values() ) {
             for( VirtualMachineProduct prd : listProducts(architecture) ) {
-                if( prd.getProductId().equals(productId) ) {
+                if( prd.getProviderProductId().equals(productId) ) {
                     return prd;
                 }
             }
@@ -214,6 +220,41 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
+    public @Nonnull Requirement identifyPasswordRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyShellKeyRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyVlanRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
+    }
+
+    @Override
+    public boolean isAPITerminationPreventable() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isBasicAnalyticsSupported() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isExtendedAnalyticsSupported() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
@@ -231,6 +272,55 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             }
             throw e;
         }
+    }
+
+    @Override
+    public boolean isUserDataSupported() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Override
+    public @Nonnull VirtualMachine launch(VMLaunchOptions withLaunchOptions) throws CloudException, InternalException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        ArrayList<NameValuePair> parameters = new ArrayList<NameValuePair>();
+        String keypair = withLaunchOptions.getBootstrapKey();
+
+        parameters.add(new BasicNameValuePair("name", withLaunchOptions.getHostName()));
+        parameters.add(new BasicNameValuePair("instanceType", withLaunchOptions.getStandardProductId()));
+        parameters.add(new BasicNameValuePair("imageID", withLaunchOptions.getMachineImageId()));
+        parameters.add(new BasicNameValuePair("location", ctx.getRegionId()));
+        if( keypair == null ) {
+            keypair = identifyKeypair();
+        }
+        parameters.add(new BasicNameValuePair("publicKey", keypair));
+        if( withLaunchOptions.getVlanId() != null ) {
+            parameters.add(new BasicNameValuePair("vlanID", withLaunchOptions.getVlanId()));
+        }
+
+        SCEMethod method = new SCEMethod(provider);
+        String response = method.post("instances", parameters);
+
+        if( response == null ) {
+            throw new CloudException("Cloud accepted the post, but no body was in the response");
+        }
+
+        Document doc = method.parseResponse(response, true);
+
+        NodeList locations = doc.getElementsByTagName("Instance");
+
+        for( int i=0; i<locations.getLength(); i++ ) {
+            Node item = locations.item(i);
+            VirtualMachine vm = toVirtualMachine(ctx, item);
+
+            if( vm != null ) {
+                return vm;
+            }
+        }
+        throw new CloudException("No instance was in the XML response");
     }
 
     @Override
@@ -259,45 +349,15 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
 
     @Override
     public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nonnull String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String[] firewallIds, @Nullable Tag... tags) throws InternalException, CloudException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new SCEConfigException("No context was configured for this request");
-        }
-        ArrayList<NameValuePair> parameters = new ArrayList<NameValuePair>();
-
-        parameters.add(new BasicNameValuePair("name", name));
-        parameters.add(new BasicNameValuePair("instanceType", product.getProductId()));
-        parameters.add(new BasicNameValuePair("imageID", fromMachineImageId));
-        parameters.add(new BasicNameValuePair("location", ctx.getRegionId()));
         if( withKeypairId == null ) {
             withKeypairId = identifyKeypair();
         }
-        parameters.add(new BasicNameValuePair("publicKey", withKeypairId));
-        if( inVlanId != null ) {
-            parameters.add(new BasicNameValuePair("vlanID", inVlanId));
+        if( inVlanId == null ) {
+            return launch(VMLaunchOptions.getInstance(product.getProviderProductId(), fromMachineImageId, name, description).inDataCenter(dataCenterId).withBoostrapKey(withKeypairId));
         }
-
-        SCEMethod method = new SCEMethod(provider);
-        String response = method.post("instances", parameters);
-
-        if( response == null ) {
-            throw new CloudException("Cloud accepted the post, but no body was in the response");
+        else {
+            return launch(VMLaunchOptions.getInstance(product.getProviderProductId(), fromMachineImageId, name, description).inVlan(null, dataCenterId, inVlanId).withBoostrapKey(withKeypairId));
         }
-
-        Document doc = method.parseResponse(response, true);
-
-        NodeList locations = doc.getElementsByTagName("Instance");
-
-        for( int i=0; i<locations.getLength(); i++ ) {
-            Node item = locations.item(i);
-            VirtualMachine vm = toVirtualMachine(ctx, item);
-
-            if( vm != null ) {
-                return vm;
-            }
-        }
-        throw new CloudException("No instance was in the XML response");
     }
 
     @Override
@@ -362,7 +422,7 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
                                     Node node = nodes.item(l);
 
                                     if( node.getNodeName().equals("ID") && node.hasChildNodes() ) {
-                                        prd.setProductId(node.getFirstChild().getNodeValue().trim());
+                                        prd.setProviderProductId(node.getFirstChild().getNodeValue().trim());
                                     }
                                     else if( node.getNodeName().equals("Label") && node.hasChildNodes() ) {
                                         prd.setName(node.getFirstChild().getNodeValue().trim());
@@ -371,8 +431,8 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
                                         prd.setDescription(node.getFirstChild().getNodeValue().trim());
                                     }
                                 }
-                                if( prd.getProductId() != null ) {
-                                    String[] parts = prd.getProductId().split("/");
+                                if( prd.getProviderProductId() != null ) {
+                                    String[] parts = prd.getProviderProductId().split("/");
 
                                     if( parts.length == 3 ) {
                                         String[] sub = parts[0].split("\\.");
@@ -387,7 +447,7 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
                                             // ignore
                                         }
                                         try {
-                                            prd.setRamInMb(Integer.parseInt(parts[1]));
+                                            prd.setRamSize(new Storage<Megabyte>(Integer.parseInt(parts[1]), Storage.MEGABYTE));
                                         }
                                         catch( NumberFormatException ignore ) {
                                             // ignore
@@ -396,17 +456,17 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
                                             int idx = parts[2].indexOf("*");
 
                                             if( idx < 1 ) {
-                                                prd.setDiskSizeInGb(Integer.parseInt(parts[2]));
+                                                prd.setRootVolumeSize(new Storage<Gigabyte>(Integer.parseInt(parts[2]), Storage.GIGABYTE));
                                             }
                                             else {
-                                                prd.setDiskSizeInGb(Integer.parseInt(parts[2].substring(0,idx)));
+                                                prd.setRootVolumeSize(new Storage<Gigabyte>(Integer.parseInt(parts[2].substring(0,idx)), Storage.GIGABYTE));
                                             }
                                         }
                                         catch( NumberFormatException ignore ) {
                                             // ignore
                                         }
                                     }
-                                    prdMap.put(prd.getProductId(), prd);
+                                    prdMap.put(prd.getProviderProductId(), prd);
                                 }
                             }
                         }
@@ -428,6 +488,20 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             products = tmp;
         }
         return products.get(architecture);
+    }
+
+    static private Collection<Architecture> architectures;
+
+    @Override
+    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
+        if( architectures == null ) {
+            ArrayList<Architecture> tmp = new ArrayList<Architecture>();
+
+            tmp.add(Architecture.I32);
+            tmp.add(Architecture.I64);
+            architectures = Collections.unmodifiableCollection(tmp);
+        }
+        return architectures;
     }
 
     @Override
@@ -460,7 +534,7 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
 
     @Override
     public void pause(@Nonnull String vmId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Starting/stopping VMs is not supported in this cloud");
+        throw new OperationNotSupportedException("Pause/unpause VMs is not supported in this cloud");
     }
 
     @Override
@@ -479,8 +553,44 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
+    public void resume(@Nonnull String vmId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Suspend/resume of VMs is not supported in this cloud");
+    }
+
+    @Override
+    public void start(@Nonnull String vmId) throws InternalException, CloudException {
+        throw new OperationNotSupportedException("Starting/stopping VMs is not supported in this cloud");
+
+    }
+
+    @Override
+    public void stop(@Nonnull String vmId) throws InternalException, CloudException {
+        throw new OperationNotSupportedException("Starting/stopping VMs is not supported in this cloud");
+    }
+
+    @Override
     public boolean supportsAnalytics() throws CloudException, InternalException {
         return false;
+    }
+
+    @Override
+    public boolean supportsPauseUnpause(@Nonnull VirtualMachine vm) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
+        return false;
+    }
+
+    @Override
+    public void suspend(@Nonnull String vmId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Suspend/resume of VMs is not supported in this cloud");
     }
 
     @Override
@@ -507,6 +617,11 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
         SCEMethod method = new SCEMethod(provider);
 
         method.delete("instances/" + vmId);
+    }
+
+    @Override
+    public void unpause(@Nonnull String vmId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Pause/unpause VMs is not supported in this cloud");
     }
 
     @Override
@@ -608,7 +723,7 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
                 vm.setProviderMachineImageId(attr.getFirstChild().getNodeValue().trim());
             }
             else if( nodeName.equalsIgnoreCase("InstanceType") && attr.hasChildNodes() ) {
-                vm.setProduct(getProduct(attr.getFirstChild().getNodeValue().trim()));
+                vm.setProductId(attr.getFirstChild().getNodeValue().trim());
             }
             else if( nodeName.equalsIgnoreCase("Status") && attr.hasChildNodes() ) {
                 String status = attr.getFirstChild().getNodeValue().trim();

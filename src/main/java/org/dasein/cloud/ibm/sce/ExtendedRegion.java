@@ -21,12 +21,11 @@ package org.dasein.cloud.ibm.sce;
 import org.dasein.cloud.dc.Region;
 
 /**
- * [Class Documentation]
+ * Extended region attributes for IBM regions.
  * <p>Created by George Reese: 7/19/12 2:10 PM</p>
- *
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @since 2012.04
  */
 public class ExtendedRegion extends Region {
     private boolean compute;

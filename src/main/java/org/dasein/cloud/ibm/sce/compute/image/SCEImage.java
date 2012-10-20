@@ -33,7 +33,6 @@ import org.dasein.cloud.compute.MachineImageState;
 import org.dasein.cloud.compute.MachineImageSupport;
 import org.dasein.cloud.compute.MachineImageType;
 import org.dasein.cloud.compute.Platform;
-import org.dasein.cloud.dc.Region;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
@@ -53,12 +52,11 @@ import java.util.Collections;
 import java.util.Locale;
 
 /**
- * [Class Documentation]
+ * Support for IBM smart cloud machine images.
  * <p>Created by George Reese: 7/17/12 1:10 PM</p>
- *
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04
+ * @since 2012.04
  */
 public class SCEImage implements MachineImageSupport {
     private SCE provider;

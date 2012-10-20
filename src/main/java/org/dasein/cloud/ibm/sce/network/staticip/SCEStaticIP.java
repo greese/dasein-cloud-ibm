@@ -30,6 +30,7 @@ import org.dasein.cloud.ibm.sce.SCEConfigException;
 import org.dasein.cloud.ibm.sce.SCEMethod;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.AddressType;
+import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.IpAddress;
 import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.IpForwardingRule;
@@ -45,15 +46,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
 /**
- * [Class Documentation]
+ * IP address support for IBM SmartCloud.
  * <p>Created by George Reese: 7/17/12 3:41 PM</p>
- *
  * @author George Reese
- * @version 2012.02
- * @since 2012.02
+ * @version 2012.04 initial version
+ * @version 2012.09 updates for the 2012.09 object model (George Reese)
+ * @since 2012.04
  */
 public class SCEStaticIP implements IpAddressSupport {
     private SCE provider;
@@ -63,6 +63,11 @@ public class SCEStaticIP implements IpAddressSupport {
     @Override
     public void assign(@Nonnull String addressId, @Nonnull String serverId) throws InternalException, CloudException {
         throw new OperationNotSupportedException("Unable to assign IP address to server");
+    }
+
+    @Override
+    public void assignToNetworkInterface(@Nonnull String addressId, @Nonnull String nicId) throws InternalException, CloudException {
+        throw new OperationNotSupportedException("SmartCloud does not support network interfaces");
     }
 
     @Override
@@ -111,7 +116,17 @@ public class SCEStaticIP implements IpAddressSupport {
     }
 
     @Override
+    public boolean isAssigned(@Nonnull IPVersion version) throws CloudException, InternalException {
+        return version.equals(IPVersion.IPV4);
+    }
+
+    @Override
     public boolean isForwarding() {
+        return false;
+    }
+
+    @Override
+    public boolean isForwarding(IPVersion version) throws CloudException, InternalException {
         return false;
     }
 
@@ -128,6 +143,11 @@ public class SCEStaticIP implements IpAddressSupport {
         catch( Exception e ) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public boolean isRequestable(@Nonnull IPVersion version) throws CloudException, InternalException {
+        return (version.equals(IPVersion.IPV4) && isRequestable(AddressType.PUBLIC));
     }
 
     @Override
@@ -263,8 +283,21 @@ public class SCEStaticIP implements IpAddressSupport {
     }
 
     @Override
+    public @Nonnull Iterable<IpAddress> listIpPool(@Nonnull IPVersion version, boolean unassignedOnly) throws InternalException, CloudException {
+        if( version.equals(IPVersion.IPV4) ) {
+            return listPublicIpPool(unassignedOnly);
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
     public @Nonnull Iterable<IpForwardingRule> listRules(@Nonnull String addressId) throws InternalException, CloudException {
         return Collections.emptyList();
+    }
+
+    @Override
+    public @Nonnull Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
+        return Collections.singletonList(IPVersion.IPV4);
     }
 
     @Override
@@ -348,8 +381,26 @@ public class SCEStaticIP implements IpAddressSupport {
     }
 
     @Override
+    public @Nonnull String request(@Nonnull IPVersion version) throws InternalException, CloudException {
+        if( version.equals(IPVersion.IPV4) ) {
+            return request(AddressType.PUBLIC);
+        }
+        throw new OperationNotSupportedException("No support for IPv6");
+    }
+
+    @Override
+    public @Nonnull String requestForVLAN(IPVersion version) throws InternalException, CloudException {
+        throw new OperationNotSupportedException("No current support for IP addresses tied to VLANs");
+    }
+
+    @Override
     public void stopForward(@Nonnull String ruleId) throws InternalException, CloudException {
         throw new OperationNotSupportedException("This cloud does not support forwarding rules");
+    }
+
+    @Override
+    public boolean supportsVLANAddresses(@Nonnull IPVersion ofVersion) throws InternalException, CloudException {
+        return false;
     }
 
     @Override
