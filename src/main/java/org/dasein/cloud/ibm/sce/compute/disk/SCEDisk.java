@@ -34,6 +34,7 @@ import org.dasein.cloud.compute.VolumeType;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
+import org.dasein.cloud.ibm.sce.SCEException;
 import org.dasein.cloud.ibm.sce.SCEMethod;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.util.CalendarWrapper;
@@ -64,7 +65,7 @@ public class SCEDisk implements VolumeSupport {
     public SCEDisk(SCE provider) { this.provider = provider; }
 
     @Override
-    public void attach(String volumeId, String toServer, String device) throws InternalException, CloudException {
+    public void attach(@Nonnull String volumeId, @Nonnull String toServer, @Nonnull String device) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -295,7 +296,7 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
-    public String create(String fromSnapshot, int sizeInGb, String inZone) throws InternalException, CloudException {
+    public @Nonnull String create(@Nonnull String fromSnapshot, int sizeInGb, @Nonnull String inZone) throws InternalException, CloudException {
         return createVolume(VolumeCreateOptions.getInstance(new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "Volume" + System.currentTimeMillis(), "Volume" + System.currentTimeMillis()));
     }
 
@@ -421,9 +422,18 @@ public class SCEDisk implements VolumeSupport {
             throw new SCEConfigException("No context was configured for this request");
         }
         SCEMethod method = new SCEMethod(provider);
-
-        Document xml = method.getAsXML("storage/" + volumeId);
-
+        Document xml;
+        try {
+            xml = method.getAsXML("storage/" + volumeId);
+        }
+        catch( SCEException e ) {
+            for( Volume v : listVolumes() ) {
+                if( v.getProviderVolumeId().equals(volumeId) ) {
+                    return (ExtendedVolume)v;
+                }
+            }
+            return null;
+        }
         if( xml == null ) {
             return null;
         }

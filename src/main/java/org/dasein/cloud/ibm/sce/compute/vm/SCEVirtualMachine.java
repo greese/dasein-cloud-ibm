@@ -56,12 +56,16 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 
 /**
  * Implementation of the Dasein Cloud virtual machine support for IBM SmartCloud.
@@ -300,7 +304,28 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
         if( withLaunchOptions.getVlanId() != null ) {
             parameters.add(new BasicNameValuePair("vlanID", withLaunchOptions.getVlanId()));
         }
+        String userData = withLaunchOptions.getUserData();
 
+        if( userData != null ) {
+             Properties p = new Properties();
+
+             try {
+                 p.load(new ByteArrayInputStream(userData.getBytes("utf-8")));
+             }
+             catch( UnsupportedEncodingException e ) {
+                 throw new InternalException(e);
+             }
+             catch( IOException e ) {
+                 throw new InternalException(e);
+             }
+             for( String key : p.stringPropertyNames() ) {
+                 String value = p.getProperty(key);
+
+                 if( value != null ) {
+                     parameters.add(new BasicNameValuePair(key, value));
+                 }
+             }
+         }
         SCEMethod method = new SCEMethod(provider);
         String response = method.post("instances", parameters);
 

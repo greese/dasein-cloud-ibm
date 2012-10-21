@@ -36,6 +36,7 @@ import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
+import org.dasein.cloud.ibm.sce.SCEException;
 import org.dasein.cloud.ibm.sce.SCEMethod;
 import org.dasein.cloud.identity.ServiceAction;
 import org.w3c.dom.Document;
