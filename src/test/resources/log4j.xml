@@ -83,7 +83,8 @@
         <appender-ref ref="ASYNCUNIT" />
     </category>
     
-    <category name="dasein.cloud.ibm.sce.wire">
+    <!-- <category name="dasein.cloud.ibm.sce.wire"> -->
+    <category name="org.apache.http">
         <priority value="DEBUG" />
         <appender-ref ref="ASYNCWIRE" />
     </category>

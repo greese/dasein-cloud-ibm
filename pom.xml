@@ -27,7 +27,7 @@
     <description>
         Support for the IBM Smart Cloud Platform
     </description>
-    <url>http://dasein-cloud.sf.net</url>
+    <url>https://github.com/greese/dasein-cloud-ibm</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -247,7 +247,7 @@
 
                     </systemProperties>
                     <includes>
-                      <!-- <include>**/SCETestSuite.java</include> -->
+                      <include>**/SCETestSuite.java</include>
                     </includes>
                 </configuration>
             </plugin>
