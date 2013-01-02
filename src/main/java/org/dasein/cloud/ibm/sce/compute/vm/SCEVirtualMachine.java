@@ -20,18 +20,23 @@ package org.dasein.cloud.ibm.sce.compute.vm;
 
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
+import org.apache.log4j.Logger;
 import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.Architecture;
+import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.MachineImageState;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VMLaunchOptions;
+import org.dasein.cloud.compute.VMScalingCapabilities;
+import org.dasein.cloud.compute.VMScalingOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VirtualMachineSupport;
@@ -76,9 +81,16 @@ import java.util.Properties;
  * @since 2012.04
  */
 public class SCEVirtualMachine implements VirtualMachineSupport {
+    static private final Logger logger = SCE.getLogger(SCEVirtualMachine.class, "std");
+
     private SCE provider;
 
     public SCEVirtualMachine(SCE provider) { this.provider = provider; }
+
+    @Override
+    public VirtualMachine alterVirtualMachine(@Nonnull String vmId, @Nonnull VMScalingOptions options) throws InternalException, CloudException {
+        throw new OperationNotSupportedException("Operation not currently supported");
+    }
 
     @Override
     public @Nonnull VirtualMachine clone(@Nonnull String vmId, @Nonnull String intoDcId, @Nonnull String name, @Nonnull String description, boolean powerOn, @Nullable String... firewallIds) throws InternalException, CloudException {
@@ -127,6 +139,11 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
+    public @Nullable VMScalingCapabilities describeVerticalScalingCapabilities() throws CloudException, InternalException {
+        return null;
+    }
+
+    @Override
     public void disableAnalytics(String vmId) throws InternalException, CloudException {
         // NO-OP
     }
@@ -162,6 +179,11 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             }
         }
         return console.toString();
+    }
+
+    @Override
+    public int getCostFactor(@Nonnull VmState state) throws InternalException, CloudException {
+        return 100;
     }
 
     @Override
@@ -224,6 +246,11 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
+    public @Nonnull Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
+        return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.NONE);
+    }
+
+    @Override
     public @Nonnull Requirement identifyPasswordRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
     }
@@ -236,6 +263,11 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     @Override
     public @Nonnull Requirement identifyShellKeyRequirement() throws CloudException, InternalException {
         return Requirement.REQUIRED;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyStaticIPRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
     }
 
     @Override
@@ -284,7 +316,7 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
-    public @Nonnull VirtualMachine launch(VMLaunchOptions withLaunchOptions) throws CloudException, InternalException {
+    public @Nonnull VirtualMachine launch(@Nonnull VMLaunchOptions withLaunchOptions) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -303,6 +335,20 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
         parameters.add(new BasicNameValuePair("publicKey", keypair));
         if( withLaunchOptions.getVlanId() != null ) {
             parameters.add(new BasicNameValuePair("vlanID", withLaunchOptions.getVlanId()));
+        }
+        String[] ips = withLaunchOptions.getStaticIpIds();
+
+        if( ips.length > 0 ) {
+            parameters.add(new BasicNameValuePair("ip", ips[0]));
+            if( ips.length > 1 ) {
+                for( int i=1; i<ips.length; i++ ) {
+                    if( i > 3 ) {
+                        logger.warn("Attempt to assign more than 3 secondary IPs to a VM in IBM SmartCloud for account " + ctx.getAccountNumber());
+                        break;
+                    }
+                    parameters.add(new BasicNameValuePair("SecondaryIP", ips[i]));
+                }
+            }
         }
         String userData = withLaunchOptions.getUserData();
 
@@ -530,6 +576,34 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
+    public @Nonnull Iterable<ResourceStatus> listVirtualMachineStatus() throws InternalException, CloudException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        SCEMethod method = new SCEMethod(provider);
+
+        Document xml = method.getAsXML("instances");
+
+        if( xml == null ) {
+            return Collections.emptyList();
+        }
+        NodeList locations = xml.getElementsByTagName("Instance");
+        ArrayList<ResourceStatus> vms = new ArrayList<ResourceStatus>();
+
+        for( int i=0; i<locations.getLength(); i++ ) {
+            Node item = locations.item(i);
+            ResourceStatus vm = toStatus(item);
+
+            if( vm != null ) {
+                vms.add(vm);
+            }
+        }
+        return vms;
+    }
+
+    @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
@@ -594,6 +668,11 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
+    public void stop(@Nonnull String vmId, boolean force) throws InternalException, CloudException {
+        throw new OperationNotSupportedException("Starting/stopping VMs is not supported in this cloud");
+    }
+
+    @Override
     public boolean supportsAnalytics() throws CloudException, InternalException {
         return false;
     }
@@ -647,6 +726,11 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     @Override
     public void unpause(@Nonnull String vmId) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Pause/unpause VMs is not supported in this cloud");
+    }
+
+    @Override
+    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        // NO-OP
     }
 
     @Override
@@ -850,4 +934,35 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             return VmState.PENDING;
         }
     }
+
+    public @Nullable ResourceStatus toStatus(@Nullable Node node) throws CloudException, InternalException {
+        if( node == null ) {
+            return null;
+        }
+        NodeList nodes = node.getChildNodes();
+        VmState state = null;
+        String vmId = null;
+
+        for( int i=0; i<nodes.getLength(); i++ ) {
+            Node attr = nodes.item(i);
+            String nodeName = attr.getNodeName();
+
+            if( nodeName.equalsIgnoreCase("ID") && attr.hasChildNodes() ) {
+                vmId = attr.getFirstChild().getNodeValue().trim();
+            }
+            else if( nodeName.equalsIgnoreCase("Status") && attr.hasChildNodes() ) {
+                String status = attr.getFirstChild().getNodeValue().trim();
+
+                state = toVmState(status);
+            }
+            if( state != null && vmId != null ) {
+                break;
+            }
+        }
+        if( vmId == null ) {
+            return null;
+        }
+        return new ResourceStatus(vmId, state == null ? VmState.PENDING : state);
+    }
+
 }

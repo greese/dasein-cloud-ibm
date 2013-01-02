@@ -24,9 +24,11 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
 import org.dasein.cloud.compute.VolumeCreateOptions;
+import org.dasein.cloud.compute.VolumeFormat;
 import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeSupport;
@@ -296,7 +298,7 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
-    public @Nonnull String create(@Nonnull String fromSnapshot, int sizeInGb, @Nonnull String inZone) throws InternalException, CloudException {
+    public @Nonnull String create(@Nullable String fromSnapshot, int sizeInGb, @Nonnull String inZone) throws InternalException, CloudException {
         return createVolume(VolumeCreateOptions.getInstance(new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "Volume" + System.currentTimeMillis(), "Volume" + System.currentTimeMillis()));
     }
 
@@ -355,7 +357,12 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
-    public void detach(String volumeId) throws InternalException, CloudException {
+    public void detach(@Nonnull String volumeId) throws InternalException, CloudException {
+        detach(volumeId, false);
+    }
+
+    @Override
+    public void detach(@Nonnull String volumeId, boolean force) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -461,7 +468,7 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
-    public Iterable<String> listPossibleDeviceIds(Platform platform) throws InternalException, CloudException {
+    public @Nonnull Iterable<String> listPossibleDeviceIds(@Nonnull Platform platform) throws InternalException, CloudException {
         ArrayList<String> list = new ArrayList<String>();
 
         if( platform.isWindows() ) {
@@ -479,6 +486,11 @@ public class SCEDisk implements VolumeSupport {
             list.add("/dev/sdj");
         }
         return list;
+    }
+
+    @Override
+    public @Nonnull Iterable<VolumeFormat> listSupportedFormats() throws InternalException, CloudException {
+        return Collections.singletonList(VolumeFormat.BLOCK);
     }
 
     @Override
@@ -561,7 +573,35 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
-    public Iterable<Volume> listVolumes() throws InternalException, CloudException {
+    public @Nonnull Iterable<ResourceStatus> listVolumeStatus() throws InternalException, CloudException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        SCEMethod method = new SCEMethod(provider);
+
+        Document xml = method.getAsXML("storage");
+
+        if( xml == null ) {
+            return Collections.emptyList();
+        }
+        NodeList volumes = xml.getElementsByTagName("Volume");
+        ArrayList<ResourceStatus> list = new ArrayList<ResourceStatus>();
+
+        for( int i=0; i<volumes.getLength(); i++ ) {
+            Node item = volumes.item(i);
+            ResourceStatus v = toStatus(item);
+
+            if( v != null ) {
+                list.add(v);
+            }
+        }
+        return list;
+    }
+
+    @Override
+    public @Nonnull Iterable<Volume> listVolumes() throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -609,7 +649,7 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
-    public void remove(String volumeId) throws InternalException, CloudException {
+    public void remove(@Nonnull String volumeId) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -647,6 +687,8 @@ public class SCEDisk implements VolumeSupport {
         ExtendedVolume volume = new ExtendedVolume();
 
         volume.setCurrentState(VolumeState.PENDING);
+        volume.setType(VolumeType.HDD);
+        volume.setFormat(VolumeFormat.BLOCK);
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attr = attributes.item(i);
             String nodeName = attr.getNodeName();
@@ -706,5 +748,35 @@ public class SCEDisk implements VolumeSupport {
         }
         System.out.println("DEBUG: Unknown volume state: " + id);
         return VolumeState.PENDING;
+    }
+
+    private @Nullable ResourceStatus toStatus(@Nullable Node node) throws CloudException, InternalException {
+        if( node == null || !node.hasChildNodes() ) {
+            return null;
+        }
+        NodeList attributes = node.getChildNodes();
+        VolumeState state = null;
+        String volumeId = null;
+
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attr = attributes.item(i);
+            String nodeName = attr.getNodeName();
+
+            if( nodeName.equalsIgnoreCase("ID") && attr.hasChildNodes()) {
+                volumeId = attr.getFirstChild().getNodeValue().trim();
+            }
+            else if( nodeName.equalsIgnoreCase("State") && attr.hasChildNodes()) {
+                String status = attr.getFirstChild().getNodeValue().trim();
+
+                state = toState(status);
+            }
+            if( volumeId != null && state != null ) {
+                break;
+            }
+        }
+        if( volumeId == null ) {
+            return null;
+        }
+        return new ResourceStatus(volumeId, state == null ? VolumeState.PENDING : state);
     }
 }

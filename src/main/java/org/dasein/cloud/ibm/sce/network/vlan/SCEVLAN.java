@@ -23,6 +23,7 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
@@ -34,6 +35,7 @@ import org.dasein.cloud.network.NetworkInterface;
 import org.dasein.cloud.network.RoutingTable;
 import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.network.VLAN;
+import org.dasein.cloud.network.VLANState;
 import org.dasein.cloud.network.VLANSupport;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
@@ -263,6 +265,11 @@ public class SCEVLAN implements VLANSupport {
     }
 
     @Override
+    public @Nonnull Iterable<ResourceStatus> listNetworkInterfaceStatus() throws CloudException, InternalException {
+        return Collections.emptyList();
+    }
+
+    @Override
     public @Nonnull Iterable<NetworkInterface> listNetworkInterfaces() throws CloudException, InternalException {
         return Collections.emptyList();
     }
@@ -295,6 +302,34 @@ public class SCEVLAN implements VLANSupport {
     @Override
     public @Nonnull Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
         return Collections.singletonList(IPVersion.IPV4);
+    }
+
+    @Override
+    public @Nonnull Iterable<ResourceStatus> listVlanStatus() throws CloudException, InternalException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        SCEMethod method = new SCEMethod(provider);
+
+        Document xml = method.getAsXML("/offerings/vlan");
+
+        if( xml == null ) {
+            return Collections.emptyList();
+        }
+        NodeList nodes = xml.getElementsByTagName("Vlan");
+        ArrayList<ResourceStatus> list = new ArrayList<ResourceStatus>();
+
+        for( int i=0; i<nodes.getLength(); i++ ) {
+            Node item = nodes.item(i);
+            ResourceStatus vlan = toVlanStatus(item);
+
+            if( vlan != null ) {
+                list.add(vlan);
+            }
+        }
+        return list;
     }
 
     @Override
@@ -405,5 +440,27 @@ public class SCEVLAN implements VLANSupport {
             vlan.setDescription(vlan.getName() + " [#" + vlan.getProviderVlanId() + "]");
         }
         return vlan;
+    }
+
+    private @Nullable ResourceStatus toVlanStatus(@Nullable Node node) throws CloudException, InternalException {
+        if( node == null || !node.hasChildNodes() ) {
+            return null;
+        }
+        NodeList attributes = node.getChildNodes();
+        String vlanId = null;
+
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attr = attributes.item(i);
+            String nodeName = attr.getNodeName();
+
+            if( nodeName.equalsIgnoreCase("ID") && attr.hasChildNodes() ) {
+                vlanId = attr.getFirstChild().getNodeValue().trim();
+                break;
+            }
+        }
+        if( vlanId == null ) {
+            return null;
+        }
+        return new ResourceStatus(vlanId, VLANState.AVAILABLE);
     }
 }

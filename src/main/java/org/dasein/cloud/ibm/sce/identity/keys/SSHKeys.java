@@ -44,7 +44,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Locale;
-import java.util.UUID;
 
 /**
  * SSH key support in the IBM SmartCloud.

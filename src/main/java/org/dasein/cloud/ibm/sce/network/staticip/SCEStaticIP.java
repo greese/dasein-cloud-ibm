@@ -24,6 +24,8 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
@@ -108,6 +110,11 @@ public class SCEStaticIP implements IpAddressSupport {
     @Override
     public @Nonnull String getProviderTermForIpAddress(@Nonnull Locale locale) {
         return "IP address";
+    }
+
+    @Override
+    public @Nonnull Requirement identifyVlanForVlanIPRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
     }
 
     @Override
@@ -291,6 +298,37 @@ public class SCEStaticIP implements IpAddressSupport {
     }
 
     @Override
+    public @Nonnull Iterable<ResourceStatus> listIpPoolStatus(@Nonnull IPVersion version) throws InternalException, CloudException {
+        if( !version.equals(IPVersion.IPV4) ) {
+            return Collections.emptyList();
+        }
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        SCEMethod method = new SCEMethod(provider);
+
+        Document xml = method.getAsXML("/addresses");
+
+        if( xml == null ) {
+            return Collections.emptyList();
+        }
+        NodeList nodes = xml.getElementsByTagName("Address");
+        ArrayList<ResourceStatus> list = new ArrayList<ResourceStatus>();
+
+        for( int i=0; i<nodes.getLength(); i++ ) {
+            Node item = nodes.item(i);
+            ResourceStatus address = toStatus(item);
+
+            if( address != null ) {
+                list.add(address);
+            }
+        }
+        return list;
+    }
+
+    @Override
     public @Nonnull Iterable<IpForwardingRule> listRules(@Nonnull String addressId) throws InternalException, CloudException {
         return Collections.emptyList();
     }
@@ -389,7 +427,12 @@ public class SCEStaticIP implements IpAddressSupport {
     }
 
     @Override
-    public @Nonnull String requestForVLAN(IPVersion version) throws InternalException, CloudException {
+    public @Nonnull String requestForVLAN(@Nonnull IPVersion version) throws InternalException, CloudException {
+        throw new OperationNotSupportedException("No current support for IP addresses tied to VLANs");
+    }
+
+    @Override
+    public @Nonnull String requestForVLAN(@Nonnull IPVersion version, @Nonnull String vlanId) throws InternalException, CloudException {
         throw new OperationNotSupportedException("No current support for IP addresses tied to VLANs");
     }
 
@@ -467,5 +510,37 @@ public class SCEStaticIP implements IpAddressSupport {
         }
         address.setAddressType(type);
         return address;
+    }
+
+    private @Nullable ResourceStatus toStatus(@Nullable Node node) throws CloudException, InternalException {
+        if( node == null || !node.hasChildNodes() ) {
+            return null;
+        }
+        NodeList attributes = node.getChildNodes();
+        String addressId = null;
+        String realState = null;
+
+        for( int i=0; i<attributes.getLength(); i++ ) {
+            Node attr = attributes.item(i);
+            String nodeName = attr.getNodeName();
+
+            if( nodeName.equalsIgnoreCase("ID") && attr.hasChildNodes() ) {
+                addressId = attr.getFirstChild().getNodeValue().trim();
+            }
+            else if( nodeName.equalsIgnoreCase("State") && attr.hasChildNodes() ) {
+                realState = attr.getFirstChild().getNodeValue().trim();
+
+                if( realState == null || realState.equals("4") || realState.equals("5") || realState.equals("6") || realState.equals("7") ) {
+                    return null;
+                }
+            }
+            if( addressId != null && realState != null ) {
+                break;
+            }
+        }
+        if( addressId == null ) {
+            return null;
+        }
+        return new ResourceStatus(addressId, true);
     }
 }
