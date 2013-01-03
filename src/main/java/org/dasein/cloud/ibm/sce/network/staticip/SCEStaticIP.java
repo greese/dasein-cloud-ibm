@@ -37,6 +37,7 @@ import org.dasein.cloud.network.IpAddress;
 import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.IpForwardingRule;
 import org.dasein.cloud.network.Protocol;
+import org.dasein.util.CalendarWrapper;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -98,10 +99,9 @@ public class SCEStaticIP implements IpAddressSupport {
             Node item = nodes.item(i);
             ExtendedIpAddress address = toAddress(ctx, item, offerings);
 
-            if( address != null ) {
-                if( addressId.equals(address.getProviderIpAddressId()) ) {
-                    return address;
-                }
+            //noinspection ConstantConditions
+            if( address != null && address.getAddress() != null && addressId.equals(address.getProviderIpAddressId()) ) {
+                return address;
             }
         }
         return null;
@@ -249,7 +249,8 @@ public class SCEStaticIP implements IpAddressSupport {
             Node item = nodes.item(i);
             IpAddress address = toAddress(ctx, item, offerings);
 
-            if( address != null ) {
+            //noinspection ConstantConditions
+            if( address != null && address.getAddress() != null ) {
                 if( address.getAddressType().equals(AddressType.PRIVATE) && (!unassignedOnly || (address.getProviderLoadBalancerId() == null && address.getServerId() == null)) ) {
                     list.add(address);
                 }
@@ -278,11 +279,14 @@ public class SCEStaticIP implements IpAddressSupport {
 
         for( int i=0; i<nodes.getLength(); i++ ) {
             Node item = nodes.item(i);
-            IpAddress address = toAddress(ctx, item, offerings);
+            ExtendedIpAddress address = toAddress(ctx, item, offerings);
 
-            if( address != null ) {
+            //noinspection ConstantConditions
+            if( address != null && address.getAddress() != null ) {
                 if( address.getAddressType().equals(AddressType.PUBLIC) && (!unassignedOnly || (address.getProviderLoadBalancerId() == null && address.getServerId() == null)) ) {
-                    list.add(address);
+                    if( !unassignedOnly || "2".equals(address.getRealState()) ) {
+                        list.add(address);
+                    }
                 }
             }
         }
@@ -362,7 +366,7 @@ public class SCEStaticIP implements IpAddressSupport {
 
     @Override
     public void releaseFromServer(@Nonnull String addressId) throws InternalException, CloudException {
-        //To change body of implemented methods use File | Settings | File Templates.        throw new OperationNotSupportedException("Unable to release IP address from server");
+        throw new OperationNotSupportedException("Unable to release IP address from server");
     }
 
     @Override
@@ -401,18 +405,22 @@ public class SCEStaticIP implements IpAddressSupport {
         NodeList nodes = doc.getElementsByTagName("Address");
 
         for( int i=0; i<nodes.getLength(); i++ ) {
-            Node item = nodes.item(i);
-            ExtendedIpAddress address = toAddress(ctx, item, offerings);
+            final ExtendedIpAddress address = toAddress(ctx, nodes.item(i), offerings);
 
             if( address != null ) {
-                while( address != null && address.getRealState().equals("0") ) {
+                long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE*20L);
+                ExtendedIpAddress ip = address;
+
+                while( timeout > System.currentTimeMillis() ) {
+                    //noinspection ConstantConditions
+                    if( ip != null && !ip.getRealState().equals("0") && ip.getAddress() != null ) {
+                        return address.getProviderIpAddressId();
+                    }
                     try { Thread.sleep(15000L); }
                     catch( InterruptedException ignore ) { }
-                    address = getIpAddress(address.getProviderIpAddressId());
+                    ip = getIpAddress(address.getProviderIpAddressId());
                 }
-                if( address != null ) {
-                    return address.getProviderIpAddressId();
-                }
+                throw new CloudException("Timed out waiting for IP assignment to static IP #" + address.getProviderIpAddressId() + " in IBM SCE");
             }
         }
         throw new CloudException("No address was found in the response");
@@ -519,6 +527,7 @@ public class SCEStaticIP implements IpAddressSupport {
         NodeList attributes = node.getChildNodes();
         String addressId = null;
         String realState = null;
+        String address = null;
 
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attr = attributes.item(i);
@@ -534,13 +543,16 @@ public class SCEStaticIP implements IpAddressSupport {
                     return null;
                 }
             }
-            if( addressId != null && realState != null ) {
+            else if( nodeName.equalsIgnoreCase("IP") && attr.hasChildNodes() ) {
+                address = attr.getFirstChild().getNodeValue().trim();
+            }
+            if( addressId != null && realState != null && address != null ) {
                 break;
             }
         }
-        if( addressId == null ) {
+        if( addressId == null || address == null ) {
             return null;
         }
-        return new ResourceStatus(addressId, true);
+        return new ResourceStatus(addressId, realState != null && realState.equals("2"));
     }
 }

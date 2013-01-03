@@ -199,25 +199,8 @@ public class SCEVLAN implements VLANSupport {
 
     @Override
     public VLAN getVlan(@Nonnull String vlanId) throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new SCEConfigException("No context was configured for this request");
-        }
-        SCEMethod method = new SCEMethod(provider);
-
-        Document xml = method.getAsXML("/offerings/vlan/" + vlanId);
-
-        if( xml == null ) {
-            return null;
-        }
-        NodeList nodes = xml.getElementsByTagName("Vlan");
-
-        for( int i=0; i<nodes.getLength(); i++ ) {
-            Node item = nodes.item(i);
-            VLAN vlan = toVlan(ctx, item);
-
-            if( vlan != null ) {
+        for( VLAN vlan : listVlans() ) {
+            if( vlan.getProviderVlanId().equals(vlanId) ) {
                 return vlan;
             }
         }
@@ -313,7 +296,7 @@ public class SCEVLAN implements VLANSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/vlan");
+        Document xml = method.getAsXML("offerings/vlan");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -341,7 +324,7 @@ public class SCEVLAN implements VLANSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/vlan");
+        Document xml = method.getAsXML("offerings/vlan");
 
         if( xml == null ) {
             return Collections.emptyList();
