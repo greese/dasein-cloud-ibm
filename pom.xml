@@ -20,7 +20,7 @@
 
     <groupId>org.dasein</groupId>
     <artifactId>dasein-cloud-ibm</artifactId>
-    <version>2013.02.1-SNAPSHOT</version>
+    <version>2013.04-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Dasein Cloud IBM</name>
@@ -62,7 +62,7 @@
         <dependency>
             <groupId>org.dasein</groupId>
             <artifactId>dasein-cloud-core</artifactId>
-            <version>2013.02.1</version>
+            <version>2013.04-SNAPSHOT</version>
             <scope>compile</scope>
             <optional>false</optional>
         </dependency>
@@ -102,7 +102,7 @@
         <dependency>
             <groupId>org.dasein</groupId>
             <artifactId>dasein-cloud-test</artifactId>
-            <version>2013.02.3</version>
+            <version>2013.04-SNAPSHOT</version>
             <scope>test</scope>
             <optional>false</optional>
         </dependency>
@@ -247,7 +247,7 @@
 
                     </systemProperties>
                     <includes>
-                      <!-- <include>**/SCETestSuite.java</include> -->
+                      <include>**/SCETestSuite.java</include>
                     </includes>
                 </configuration>
             </plugin>
