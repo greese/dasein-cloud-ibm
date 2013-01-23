@@ -133,7 +133,7 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             }
             try { Thread.sleep(15000L); }
             catch( InterruptedException ignore ) { }
-            img = provider.getComputeServices().getImageSupport().getMachineImage(machineImageId);
+            img = provider.getComputeServices().getImageSupport().getImage(machineImageId);
         }
         return launch(machineImageId, prd, intoDcId, name, description, null, null, false, false, firewallIds, new Tag[0]);
     }
@@ -256,12 +256,22 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
+    public @Nonnull Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
     public @Nonnull Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
     }
 
     @Override
     public @Nonnull Requirement identifyShellKeyRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
         return Requirement.REQUIRED;
     }
 

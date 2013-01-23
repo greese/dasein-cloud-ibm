@@ -162,6 +162,11 @@ public class SCEImage implements MachineImageSupport {
     }
 
     @Override
+    public @Nonnull String getProviderTermForCustomImage(@Nonnull Locale locale, @Nonnull ImageClass cls) {
+        return getProviderTermForImage(locale, cls);
+    }
+
+    @Override
     public boolean hasPublicLibrary() {
         return true;
     }
@@ -431,6 +436,11 @@ public class SCEImage implements MachineImageSupport {
 
     @Override
     public void remove(@Nonnull String machineImageId) throws CloudException, InternalException {
+        remove(machineImageId, false);
+    }
+
+    @Override
+    public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -439,7 +449,7 @@ public class SCEImage implements MachineImageSupport {
 
         SCEMethod method = new SCEMethod(provider);
 
-        method.delete("/offerings/image/" + machineImageId);
+        method.delete("/offerings/image/" + providerImageId);
     }
 
     @Override

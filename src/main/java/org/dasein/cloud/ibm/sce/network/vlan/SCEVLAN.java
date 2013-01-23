@@ -24,14 +24,20 @@ import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
 import org.dasein.cloud.ibm.sce.SCEMethod;
 import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.network.Firewall;
+import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IPVersion;
+import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.NICCreateOptions;
 import org.dasein.cloud.network.NetworkInterface;
+import org.dasein.cloud.network.NetworkServices;
+import org.dasein.cloud.network.Networkable;
 import org.dasein.cloud.network.RoutingTable;
 import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.network.VLAN;
@@ -271,6 +277,47 @@ public class SCEVLAN implements VLANSupport {
     public @Nonnull Iterable<NetworkInterface> listNetworkInterfacesInVLAN(@Nonnull String vlanId) throws CloudException, InternalException {
         return Collections.emptyList();
     }
+
+    @Override
+    public @Nonnull Iterable<Networkable> listResources(@Nonnull String inVlanId) throws CloudException, InternalException {
+        ArrayList<Networkable> resources = new ArrayList<Networkable>();
+        NetworkServices network = provider.getNetworkServices();
+
+        FirewallSupport fwSupport = network.getFirewallSupport();
+
+        if( fwSupport != null ) {
+            for( Firewall fw : fwSupport.list() ) {
+                if( inVlanId.equals(fw.getProviderVlanId()) ) {
+                    resources.add(fw);
+                }
+            }
+        }
+
+        IpAddressSupport ipSupport = network.getIpAddressSupport();
+
+        if( ipSupport != null ) {
+            for( IPVersion version : ipSupport.listSupportedIPVersions() ) {
+                for( org.dasein.cloud.network.IpAddress addr : ipSupport.listIpPool(version, false) ) {
+                    if( inVlanId.equals(addr.getProviderVlanId()) ) {
+                        resources.add(addr);
+                    }
+                }
+
+            }
+        }
+        for( RoutingTable table : listRoutingTables(inVlanId) ) {
+            resources.add(table);
+        }
+        Iterable<VirtualMachine> vms = provider.getComputeServices().getVirtualMachineSupport().listVirtualMachines();
+
+        for( VirtualMachine vm : vms ) {
+            if( inVlanId.equals(vm.getProviderVlanId()) ) {
+                resources.add(vm);
+            }
+        }
+        return resources;
+    }
+
 
     @Override
     public @Nonnull Iterable<RoutingTable> listRoutingTables(@Nonnull String inVlanId) throws CloudException, InternalException {
