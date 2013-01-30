@@ -30,6 +30,7 @@ import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
 import org.dasein.cloud.ibm.sce.SCEMethod;
 import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.network.AbstractVLANSupport;
 import org.dasein.cloud.network.Firewall;
 import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IPVersion;
@@ -40,9 +41,9 @@ import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.Networkable;
 import org.dasein.cloud.network.RoutingTable;
 import org.dasein.cloud.network.Subnet;
+import org.dasein.cloud.network.SubnetCreateOptions;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANState;
-import org.dasein.cloud.network.VLANSupport;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -63,7 +64,7 @@ import java.util.Locale;
  * @version 2012.09 updates for the 2012.09 object model
  * @since 2012.04
  */
-public class SCEVLAN implements VLANSupport {
+public class SCEVLAN extends AbstractVLANSupport {
     private SCE provider;
 
     public SCEVLAN(SCE provider) { this.provider = provider; }
@@ -134,7 +135,7 @@ public class SCEVLAN implements VLANSupport {
     }
 
     @Override
-    public @Nonnull Subnet createSubnet(@Nonnull String cidr, @Nonnull String inProviderVlanId, @Nonnull String name, @Nonnull String description) throws CloudException, InternalException {
+    public @Nonnull Subnet createSubnet(@Nonnull SubnetCreateOptions options) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Cannot create subnets");
     }
 

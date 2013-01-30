@@ -21,27 +21,23 @@ package org.dasein.cloud.ibm.sce.compute.vm;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.log4j.Logger;
-import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
+import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
+import org.dasein.cloud.compute.ImageCreateOptions;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.MachineImageState;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VMLaunchOptions;
-import org.dasein.cloud.compute.VMScalingCapabilities;
-import org.dasein.cloud.compute.VMScalingOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineProduct;
-import org.dasein.cloud.compute.VirtualMachineSupport;
 import org.dasein.cloud.compute.VmState;
-import org.dasein.cloud.compute.VmStatistics;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
 import org.dasein.cloud.ibm.sce.SCEConfigException;
@@ -57,7 +53,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletResponse;
@@ -80,53 +75,35 @@ import java.util.Properties;
  * @version 2012.09 updated with support for new 2012.09 object model (George Reese)
  * @since 2012.04
  */
-public class SCEVirtualMachine implements VirtualMachineSupport {
+public class SCEVirtualMachine extends AbstractVMSupport {
     static private final Logger logger = SCE.getLogger(SCEVirtualMachine.class, "std");
 
     private SCE provider;
 
-    public SCEVirtualMachine(SCE provider) { this.provider = provider; }
-
-    @Override
-    public VirtualMachine alterVirtualMachine(@Nonnull String vmId, @Nonnull VMScalingOptions options) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Operation not currently supported");
+    public SCEVirtualMachine(SCE provider) {
+        super(provider);
+        this.provider = provider;
     }
 
     @Override
     public @Nonnull VirtualMachine clone(@Nonnull String vmId, @Nonnull String intoDcId, @Nonnull String name, @Nonnull String description, boolean powerOn, @Nullable String... firewallIds) throws InternalException, CloudException {
-        AsynchronousTask<String> t = provider.getComputeServices().getImageSupport().imageVirtualMachine(vmId, name, description);
         VirtualMachine vm = getVirtualMachine(vmId);
 
         if( vm == null ) {
             throw new CloudException("No such virtual machine: " + vmId);
         }
+        ImageCreateOptions options = ImageCreateOptions.getInstance(vm,  name, description);
+
+
+        MachineImage img = provider.getComputeServices().getImageSupport().captureImage(options);
         VirtualMachineProduct prd = getProduct(vm.getProductId());
 
         if( prd == null ) {
             throw new CloudException("Unknown product associated with VM");
         }
-        long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 20L);
+        long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 10L);
+        String machineImageId = img.getProviderMachineImageId();
 
-        while( !t.isComplete() ) {
-            if( System.currentTimeMillis() > timeout ) {
-                throw new CloudException("Cloud timed out while creating an image for cloning");
-            }
-            try { Thread.sleep(15000L); }
-            catch( InterruptedException ignore ) { }
-        }
-        Throwable error = t.getTaskError();
-
-        if( error != null ) {
-            throw new CloudException(error);
-        }
-        String machineImageId = t.getResult();
-
-        if( machineImageId == null || machineImageId.equals("") ) {
-            throw new CloudException("No machine image from which to clone");
-        }
-        MachineImage img = provider.getComputeServices().getImageSupport().getMachineImage(machineImageId);
-
-        timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 10L);
         while( img == null || !MachineImageState.ACTIVE.equals(img.getCurrentState()) ) {
             if( System.currentTimeMillis() > timeout ) {
                 throw new CloudException("Cloud timed out while waiting for cloning image");
@@ -136,21 +113,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             img = provider.getComputeServices().getImageSupport().getImage(machineImageId);
         }
         return launch(machineImageId, prd, intoDcId, name, description, null, null, false, false, firewallIds, new Tag[0]);
-    }
-
-    @Override
-    public @Nullable VMScalingCapabilities describeVerticalScalingCapabilities() throws CloudException, InternalException {
-        return null;
-    }
-
-    @Override
-    public void disableAnalytics(String vmId) throws InternalException, CloudException {
-        // NO-OP
-    }
-
-    @Override
-    public void enableAnalytics(String vmId) throws InternalException, CloudException {
-        // NO-OP
     }
 
     @Override
@@ -179,16 +141,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             }
         }
         return console.toString();
-    }
-
-    @Override
-    public int getCostFactor(@Nonnull VmState state) throws InternalException, CloudException {
-        return 100;
-    }
-
-    @Override
-    public int getMaximumVirtualMachineCount() throws CloudException, InternalException {
-        return -2;
     }
 
     @Override
@@ -236,23 +188,8 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
-    public VmStatistics getVMStatistics(String vmId, long from, long to) throws InternalException, CloudException {
-        return null;
-    }
-
-    @Override
-    public @Nonnull Iterable<VmStatistics> getVMStatisticsForPeriod(@Nonnull String vmId, @Nonnegative long from, @Nonnegative long to) throws InternalException, CloudException {
-        return Collections.emptyList();
-    }
-
-    @Override
     public @Nonnull Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.NONE);
-    }
-
-    @Override
-    public @Nonnull Requirement identifyPasswordRequirement() throws CloudException, InternalException {
-        return Requirement.NONE;
     }
 
     @Override
@@ -263,11 +200,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     @Override
     public @Nonnull Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyShellKeyRequirement() throws CloudException, InternalException {
-        return Requirement.REQUIRED;
     }
 
     @Override
@@ -404,11 +336,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
         throw new CloudException("No instance was in the XML response");
     }
 
-    @Override
-    public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nonnull String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String... firewallIds) throws InternalException, CloudException {
-        return this.launch(fromMachineImageId, product, dataCenterId, name, description, withKeypairId, inVlanId, withAnalytics, asSandbox, firewallIds, new Tag[0]);
-    }
-
     private @Nonnull String identifyKeypair() throws CloudException, InternalException {
         SSHKeys keys = provider.getIdentityServices().getShellKeySupport();
 
@@ -426,19 +353,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             return id;
         }
         throw new CloudException("Unable to identify keys in the cloud");
-    }
-
-    @Override
-    public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nonnull String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String[] firewallIds, @Nullable Tag... tags) throws InternalException, CloudException {
-        if( withKeypairId == null ) {
-            withKeypairId = identifyKeypair();
-        }
-        if( inVlanId == null ) {
-            return launch(VMLaunchOptions.getInstance(product.getProviderProductId(), fromMachineImageId, name, description).inDataCenter(dataCenterId).withBoostrapKey(withKeypairId));
-        }
-        else {
-            return launch(VMLaunchOptions.getInstance(product.getProviderProductId(), fromMachineImageId, name, description).inVlan(null, dataCenterId, inVlanId).withBoostrapKey(withKeypairId));
-        }
     }
 
     @Override
@@ -571,20 +485,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
         return products.get(architecture);
     }
 
-    static private Collection<Architecture> architectures;
-
-    @Override
-    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
-        if( architectures == null ) {
-            ArrayList<Architecture> tmp = new ArrayList<Architecture>();
-
-            tmp.add(Architecture.I32);
-            tmp.add(Architecture.I64);
-            architectures = Collections.unmodifiableCollection(tmp);
-        }
-        return architectures;
-    }
-
     @Override
     public @Nonnull Iterable<ResourceStatus> listVirtualMachineStatus() throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
@@ -642,11 +542,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
-    public void pause(@Nonnull String vmId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Pause/unpause VMs is not supported in this cloud");
-    }
-
-    @Override
     public void reboot(@Nonnull String vmId) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
@@ -662,32 +557,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     }
 
     @Override
-    public void resume(@Nonnull String vmId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Suspend/resume of VMs is not supported in this cloud");
-    }
-
-    @Override
-    public void start(@Nonnull String vmId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Starting/stopping VMs is not supported in this cloud");
-
-    }
-
-    @Override
-    public void stop(@Nonnull String vmId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Starting/stopping VMs is not supported in this cloud");
-    }
-
-    @Override
-    public void stop(@Nonnull String vmId, boolean force) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Starting/stopping VMs is not supported in this cloud");
-    }
-
-    @Override
-    public boolean supportsAnalytics() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
     public boolean supportsPauseUnpause(@Nonnull VirtualMachine vm) {
         return false;
     }
@@ -700,11 +569,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     @Override
     public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
         return false;
-    }
-
-    @Override
-    public void suspend(@Nonnull String vmId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Suspend/resume of VMs is not supported in this cloud");
     }
 
     @Override
@@ -731,31 +595,6 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
         SCEMethod method = new SCEMethod(provider);
 
         method.delete("instances/" + vmId);
-    }
-
-    @Override
-    public void unpause(@Nonnull String vmId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Pause/unpause VMs is not supported in this cloud");
-    }
-
-    @Override
-    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void updateTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
     }
 
     @Override

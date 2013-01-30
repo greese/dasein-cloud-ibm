@@ -28,9 +28,11 @@ import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
+import org.dasein.cloud.compute.AbstractImageSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.ImageCreateOptions;
+import org.dasein.cloud.compute.ImageFilterOptions;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.MachineImageFormat;
 import org.dasein.cloud.compute.MachineImageState;
@@ -61,59 +63,12 @@ import java.util.Locale;
  * @version 2012.04
  * @since 2012.04
  */
-public class SCEImage implements MachineImageSupport {
+public class SCEImage extends AbstractImageSupport {
     private SCE provider;
 
-    public SCEImage(SCE provider) { this.provider = provider; }
-
-    @Override
-    public void addImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No direct image sharing is supported");
-    }
-
-    @Override
-    public void addPublicShare(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No public image sharing is supported");
-    }
-
-    @Override
-    public @Nonnull String bundleVirtualMachine(@Nonnull String virtualMachineId, @Nonnull MachineImageFormat format, @Nonnull String bucket, @Nonnull String name) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image bundling is not supported");
-    }
-
-    @Override
-    public void bundleVirtualMachineAsync(@Nonnull String virtualMachineId, @Nonnull MachineImageFormat format, @Nonnull String bucket, @Nonnull String name, @Nonnull AsynchronousTask<String> trackingTask) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image bundling is not supported");
-    }
-
-    @Override
-    public @Nonnull MachineImage captureImage(@Nonnull ImageCreateOptions options) throws CloudException, InternalException {
-        MachineImage img = getImage(image(options));
-
-        if( img == null ) {
-            throw new CloudException("Imaging completed successfully, but no such image exists");
-        }
-        return img;
-    }
-
-    @Override
-    public void captureImageAsync(final @Nonnull ImageCreateOptions options, final @Nonnull AsynchronousTask<MachineImage> taskTracker) throws CloudException, InternalException {
-        Thread t = new Thread() {
-            public void run() {
-                try {
-                    MachineImage img = captureImage(options);
-
-                    taskTracker.completeWithResult(img);
-                }
-                catch( Throwable t ) {
-                    taskTracker.complete(t);
-                }
-            }
-        };
-
-        t.setName("IBM SCE Image Bundler (VM ID #" + options.getVirtualMachineId() + ")");
-        t.setDaemon(true);
-        t.start();
+    public SCEImage(SCE provider) {
+        super(provider);
+        this.provider = provider;
     }
 
     @Override
@@ -145,25 +100,8 @@ public class SCEImage implements MachineImageSupport {
     }
 
     @Override
-    @Deprecated
-    public @Nullable MachineImage getMachineImage(@Nonnull String machineImageId) throws CloudException, InternalException {
-        return getImage(machineImageId);
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull String getProviderTermForImage(@Nonnull Locale locale) {
-        return getProviderTermForImage(locale, ImageClass.MACHINE);
-    }
-
-    @Override
     public @Nonnull String getProviderTermForImage(@Nonnull Locale locale, @Nonnull ImageClass cls) {
         return (cls.equals(ImageClass.MACHINE) ? "image" : "unsupported image type");
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForCustomImage(@Nonnull Locale locale, @Nonnull ImageClass cls) {
-        return getProviderTermForImage(locale, cls);
     }
 
     @Override
@@ -177,32 +115,7 @@ public class SCEImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull AsynchronousTask<String> imageVirtualMachine(final @Nonnull String vmId, final @Nonnull String name, final @Nonnull String description) throws CloudException, InternalException {
-        final VirtualMachine vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId);
-
-        if( vm == null ) {
-            throw new CloudException("No such virtual machine: " + vmId);
-        }
-        final AsynchronousTask<String> task = new AsynchronousTask<String>();
-        Thread t = new Thread() {
-            public void run() {
-                try {
-                    task.completeWithResult(image(ImageCreateOptions.getInstance(vm,  name, description)));
-                }
-                catch( Throwable t ) {
-                    task.complete(t);
-                }
-            }
-        };
-
-        t.setName("Image bundler " + vmId);
-        t.setDaemon(true);
-        t.start();
-
-        return task;
-    }
-
-    private @Nonnull String image(@Nonnull ImageCreateOptions options) throws CloudException, InternalException {
+    protected @Nonnull MachineImage capture(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -230,7 +143,10 @@ public class SCEImage implements MachineImageSupport {
             MachineImage img = toMachineImage(ctx, item, null, null, null, null);
 
             if( img != null ) {
-                return img.getProviderMachineImageId();
+                if( task != null ) {
+                    task.completeWithResult(img);
+                }
+                return img;
             }
         }
         throw new CloudException("No image was in the XML response from the cloud");
@@ -322,12 +238,18 @@ public class SCEImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull Iterable<MachineImage> listImages(@Nonnull ImageClass cls) throws CloudException, InternalException {
+    public @Nonnull Iterable<MachineImage> listImages(@Nullable ImageFilterOptions options) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
             throw new SCEConfigException("No context was configured for this request");
         }
+        ImageClass cls = (options == null ? null : options.getImageClass());
+
+        if( cls != null && !cls.equals(ImageClass.MACHINE) ) {
+            return Collections.emptyList();
+        }
+        String account = (options == null ? null : options.getAccountNumber());
         SCEMethod method = new SCEMethod(provider);
 
         Document xml = method.getAsXML("/offerings/image");
@@ -341,67 +263,13 @@ public class SCEImage implements MachineImageSupport {
         for( int i=0; i<items.getLength(); i++ ) {
             Node item = items.item(i);
 
-            MachineImage img = toMachineImage(ctx, item, ctx.getAccountNumber(), null, null, null);
+            MachineImage img = toMachineImage(ctx, item, ctx.getAccountNumber(), account, null, null);
 
             if( img != null ) {
                 images.add(img);
             }
         }
         return images;
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImage> listImages(@Nonnull ImageClass cls, @Nonnull String ownedBy) throws CloudException, InternalException {
-        if( !cls.equals(ImageClass.MACHINE) ) {
-            return Collections.emptyList();
-        }
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new SCEConfigException("No context was configured for this request");
-        }
-        SCEMethod method = new SCEMethod(provider);
-
-        Document xml = method.getAsXML("/offerings/image");
-
-        if( xml == null ) {
-            return Collections.emptyList();
-        }
-        NodeList items = xml.getElementsByTagName("Image");
-        ArrayList<MachineImage> images = new ArrayList<MachineImage>();
-
-        for( int i=0; i<items.getLength(); i++ ) {
-            Node item = items.item(i);
-
-            MachineImage img = toMachineImage(ctx, item, ownedBy, null, null, null);
-
-            if( img != null ) {
-                images.add(img);
-            }
-        }
-        return images;
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull Iterable<MachineImage> listMachineImages() throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new SCEConfigException("No context was specified for this request");
-        }
-        return listImages(ImageClass.MACHINE, ctx.getAccountNumber());
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull Iterable<MachineImage> listMachineImagesOwnedBy(String accountId) throws CloudException, InternalException {
-        if( accountId == null ) {
-            return listImages(ImageClass.MACHINE);
-        }
-        else {
-            return listImages(ImageClass.MACHINE, accountId);
-        }
     }
 
     @Override
@@ -430,16 +298,6 @@ public class SCEImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull MachineImage registerImageBundle(@Nonnull ImageCreateOptions options) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("This operation is not currently supported");
-    }
-
-    @Override
-    public void remove(@Nonnull String machineImageId) throws CloudException, InternalException {
-        remove(machineImageId, false);
-    }
-
-    @Override
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
         ProviderContext ctx = provider.getContext();
 
@@ -450,21 +308,6 @@ public class SCEImage implements MachineImageSupport {
         SCEMethod method = new SCEMethod(provider);
 
         method.delete("/offerings/image/" + providerImageId);
-    }
-
-    @Override
-    public void removeAllImageShares(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No direct image sharing is supported");
-    }
-
-    @Override
-    public void removeImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No direct image sharing is supported");
-    }
-
-    @Override
-    public void removePublicShare(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No public image sharing is supported");
     }
 
     @Override
@@ -521,12 +364,6 @@ public class SCEImage implements MachineImageSupport {
     }
 
     @Override
-    @Deprecated
-    public void shareMachineImage(@Nonnull String machineImageId, @Nullable String withAccountId, boolean allow) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("There is no API to share machine images");
-    }
-
-    @Override
     public boolean supportsCustomImages() {
         return true;
     }
@@ -553,27 +390,7 @@ public class SCEImage implements MachineImageSupport {
 
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void updateTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
+        return cls.equals(ImageClass.MACHINE);
     }
 
     @Override
