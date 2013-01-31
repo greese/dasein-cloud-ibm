@@ -67,7 +67,10 @@ import java.util.Locale;
 public class SCEVLAN extends AbstractVLANSupport {
     private SCE provider;
 
-    public SCEVLAN(SCE provider) { this.provider = provider; }
+    public SCEVLAN(SCE provider) {
+        super(provider);
+        this.provider = provider;
+    }
 
     @Override
     public void addRouteToAddress(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String address) throws CloudException, InternalException {
