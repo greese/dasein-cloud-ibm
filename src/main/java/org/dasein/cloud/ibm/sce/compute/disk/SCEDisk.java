@@ -25,13 +25,13 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.compute.AbstractVolumeSupport;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
 import org.dasein.cloud.compute.VolumeCreateOptions;
 import org.dasein.cloud.compute.VolumeFormat;
 import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
-import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.compute.VolumeType;
 import org.dasein.cloud.ibm.sce.ExtendedRegion;
 import org.dasein.cloud.ibm.sce.SCE;
@@ -61,10 +61,13 @@ import java.util.Locale;
  * @version 2012.09 updated to new object model (George Reese)
  * @since 2012.04
  */
-public class SCEDisk implements VolumeSupport {
+public class SCEDisk extends AbstractVolumeSupport {
     private SCE provider;
 
-    public SCEDisk(SCE provider) { this.provider = provider; }
+    public SCEDisk(SCE provider) {
+        super(provider);
+        this.provider = provider;
+    }
 
     @Override
     public void attach(@Nonnull String volumeId, @Nonnull String toServer, @Nonnull String device) throws InternalException, CloudException {
@@ -298,11 +301,6 @@ public class SCEDisk implements VolumeSupport {
     }
 
     @Override
-    public @Nonnull String create(@Nullable String fromSnapshot, int sizeInGb, @Nonnull String inZone) throws InternalException, CloudException {
-        return createVolume(VolumeCreateOptions.getInstance(new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "Volume" + System.currentTimeMillis(), "Volume" + System.currentTimeMillis()));
-    }
-
-    @Override
     public @Nonnull String createVolume(@Nonnull VolumeCreateOptions options) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
@@ -354,11 +352,6 @@ public class SCEDisk implements VolumeSupport {
             }
         }
         throw new CloudException("No volume was in the XML response");
-    }
-
-    @Override
-    public void detach(@Nonnull String volumeId) throws InternalException, CloudException {
-        detach(volumeId, false);
     }
 
     @Override
