@@ -86,7 +86,7 @@ public class SCEImage extends AbstractImageSupport {
         for( int i=0; i<items.getLength(); i++ ) {
             Node item = items.item(i);
 
-            MachineImage img = toMachineImage(ctx, item, null, null, null, null);
+            MachineImage img = toMachineImage(ctx, item);
 
             if( img != null ) {
                 return img;
@@ -136,7 +136,7 @@ public class SCEImage extends AbstractImageSupport {
         for( int i=0; i<items.getLength(); i++ ) {
             Node item = items.item(i);
 
-            MachineImage img = toMachineImage(ctx, item, null, null, null, null);
+            MachineImage img = toMachineImage(ctx, item);
 
             if( img != null ) {
                 if( task != null ) {
@@ -245,7 +245,6 @@ public class SCEImage extends AbstractImageSupport {
         if( cls != null && !cls.equals(ImageClass.MACHINE) ) {
             return Collections.emptyList();
         }
-        String account = (options == null ? null : options.getAccountNumber());
         SCEMethod method = new SCEMethod(provider);
 
         Document xml = method.getAsXML("/offerings/image");
@@ -259,9 +258,9 @@ public class SCEImage extends AbstractImageSupport {
         for( int i=0; i<items.getLength(); i++ ) {
             Node item = items.item(i);
 
-            MachineImage img = toMachineImage(ctx, item, ctx.getAccountNumber(), account, null, null);
+            MachineImage img = toMachineImage(ctx, item);
 
-            if( img != null ) {
+            if( img != null && (options == null || options.matches(img)) ) {
                 images.add(img);
             }
         }
@@ -313,50 +312,8 @@ public class SCEImage extends AbstractImageSupport {
     }
 
     @Override
-    public @Nonnull Iterable<MachineImage> searchImages(@Nullable String accountNumber, @Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
-        if( imageClasses != null ) {
-            boolean ok = false;
-
-            for( ImageClass cls : imageClasses ) {
-                if( cls.equals(ImageClass.MACHINE) ) {
-                    ok = true;
-                    break;
-                }
-            }
-            if( !ok ) {
-                return Collections.emptyList();
-            }
-        }
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new SCEConfigException("No context was configured for this request");
-        }
-        SCEMethod method = new SCEMethod(provider);
-
-        Document xml = method.getAsXML("/offerings/image");
-
-        if( xml == null ) {
-            return Collections.emptyList();
-        }
-        NodeList items = xml.getElementsByTagName("Image");
-        ArrayList<MachineImage> images = new ArrayList<MachineImage>();
-
-        for( int i=0; i<items.getLength(); i++ ) {
-            Node item = items.item(i);
-
-            MachineImage img = toMachineImage(ctx, item, accountNumber, keyword, platform, architecture);
-
-            if( img != null ) {
-                images.add(img);
-            }
-        }
-        return images;
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImage> searchPublicImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
-        return searchImages(null, keyword, platform, architecture, imageClasses);
+    public @Nonnull Iterable<MachineImage> searchPublicImages(@Nonnull ImageFilterOptions options) throws CloudException, InternalException {
+        return listImages(options);
     }
 
     @Override
@@ -394,7 +351,7 @@ public class SCEImage extends AbstractImageSupport {
         return new String[0];
     }
 
-    private @Nullable MachineImage toMachineImage(@Nonnull ProviderContext ctx, @Nullable Node node, @Nullable String accountId, @Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture) throws CloudException, InternalException {
+    private @Nullable MachineImage toMachineImage(@Nonnull ProviderContext ctx, @Nullable Node node) throws CloudException, InternalException {
         if( node == null || !node.hasChildNodes() ) {
             return null;
         }
@@ -455,35 +412,14 @@ public class SCEImage extends AbstractImageSupport {
         if( !regionId.equals(ctx.getRegionId()) ) {
             return null;
         }
-        if( accountId != null && !accountId.equals(img.getProviderOwnerId()) ) {
-            return null;
-        }
         if( img.getName() == null ) {
             img.setName(img.getProviderMachineImageId());
         }
         if( img.getDescription() == null ) {
             img.setDescription(img.getName() + " [#" + img.getProviderMachineImageId() + "]");
         }
-        if( keyword != null ) {
-            keyword = keyword.toLowerCase();
-            if( !img.getName().toLowerCase().contains(keyword) && !img.getDescription().contains(keyword) ) {
-                return null;
-            }
-        }
         if( img.getPlatform() == null || img.getPlatform().equals(Platform.UNKNOWN) ) {
             img.setPlatform(toPlatform(img.getName() + " " + img.getDescription()));
-        }
-        if( platform != null && !platform.equals(Platform.UNKNOWN)) {
-            Platform p = img.getPlatform();
-
-            if( !platform.equals(p) ) {
-                if( !(platform.equals(Platform.UNIX) && p.isUnix()) ) {
-                    return null;
-                }
-            }
-        }
-        if( architecture != null && !architecture.equals(img.getArchitecture()) ) {
-            return null;
         }
         return img;
     }

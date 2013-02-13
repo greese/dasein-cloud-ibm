@@ -79,8 +79,8 @@ public class SCEMethod {
     private String endpoint;
     private SCE provider;
 
-    public SCEMethod(SCE azure) throws InternalException {
-        provider = azure;
+    public SCEMethod(SCE cloud) throws InternalException {
+        provider = cloud;
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
