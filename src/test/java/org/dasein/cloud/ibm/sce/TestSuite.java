@@ -18,9 +18,7 @@
 
 package org.dasein.cloud.ibm.sce;
 
-import junit.framework.Test;
-import org.dasein.cloud.test.ComprehensiveTestSuite;
-import org.dasein.cloud.test.TestConfigurationException;
+import org.dasein.cloud.test.GlobalTestSuite;
 
 /**
  * [Class Documentation]
@@ -29,8 +27,5 @@ import org.dasein.cloud.test.TestConfigurationException;
  * @version 2012.02
  * @since 2012.02
  */
-public class SCETestSuite {
-    static public Test suite() throws TestConfigurationException {
-        return new ComprehensiveTestSuite(SCE.class);
-    }
+public class TestSuite extends GlobalTestSuite {
 }

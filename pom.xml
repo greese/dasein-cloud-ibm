@@ -201,6 +201,10 @@
                 <configuration>
                     <systemProperties>
                         <property>
+                            <name>providerClass</name>
+                            <value>${providerClass}</value>
+                        </property>
+                        <property>
                             <name>endpoint</name>
                             <value>${endpoint}</value>
                         </property>
@@ -213,15 +217,15 @@
                             <value>${apiSharedKey}</value>
                         </property>
                         <property>
-                            <name>x509Cert</name>
-                            <value>${x509Cert}</value>
-                        </property>
-                        <property>
-                            <name>x509Key</name>
-                            <value>${x509Key}</value>
-                        </property>
-                        <property>
                             <name>apiSecretKey</name>
+                            <value>${apiSecretKey}</value>
+                        </property>
+                        <property>
+                            <name>accessPublic</name>
+                            <value>${apiSharedKey}</value>
+                        </property>
+                        <property>
+                            <name>accessPrivate</name>
                             <value>${apiSecretKey}</value>
                         </property>
                         <property>
@@ -238,7 +242,7 @@
                         </property>
                         <property>
                             <name>test.region</name>
-                            <value>${test.region}</value>
+                            <value>${regionId}</value>
                         </property>
                         <property>
                             <name>test.dataCenter</name>
@@ -255,7 +259,7 @@
 
                     </systemProperties>
                     <includes>
-                      <include>**/SCETestSuite.java</include>
+                      <include>**/TestSuite.java</include>
                     </includes>
                 </configuration>
             </plugin>

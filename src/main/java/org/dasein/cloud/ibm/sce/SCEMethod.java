@@ -46,6 +46,7 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.util.APITrace;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
@@ -122,6 +123,7 @@ public class SCEMethod {
             StatusLine status;
 
             try {
+                APITrace.trace(provider, resource);
                 response = client.execute(method);
                 status = response.getStatusLine();
             }
@@ -185,14 +187,14 @@ public class SCEMethod {
 
     public @Nullable Document getAsXML(@Nonnull String resource) throws CloudException, InternalException {
         try {
-            return getAsXML(new URI(endpoint + resource));
+            return getAsXML(new URI(endpoint + resource), resource);
         }
         catch( URISyntaxException e ) {
             throw new InternalException("Endpoint misconfiguration (" + endpoint + resource + "): " + e.getMessage());
         }
     }
 
-    public @Nullable Document getAsXML(@Nonnull URI uri) throws CloudException, InternalException {
+    public @Nullable Document getAsXML(@Nonnull URI uri, @Nonnull String resource) throws CloudException, InternalException {
         Logger std = SCE.getLogger(SCEMethod.class, "std");
         Logger wire = SCE.getLogger(SCEMethod.class, "wire");
 
@@ -219,6 +221,7 @@ public class SCEMethod {
             StatusLine status;
 
             try {
+                APITrace.trace(provider, resource);
                 response = client.execute(get);
                 status = response.getStatusLine();
             }
@@ -470,6 +473,7 @@ public class SCEMethod {
             StatusLine status;
 
             try {
+                APITrace.trace(provider, resource);
                 response = client.execute(post);
                 status = response.getStatusLine();
             }
@@ -599,6 +603,7 @@ public class SCEMethod {
             StatusLine status;
 
             try {
+                APITrace.trace(provider, resource);
                 response = client.execute(method);
                 status = response.getStatusLine();
             }
