@@ -76,8 +76,17 @@ public class SCEImage extends AbstractImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image/" + providerImageId);
+        Document xml;
 
+        try {
+            xml = method.getAsXML("/offerings/image/" + providerImageId);
+        }
+        catch( CloudException whatiswrongwithIBM ) {
+            // SmartCloud throws a 500 error when the image doesn't exist
+            // Seriously
+            // I want to say a lot of very bad words here
+            return null;
+        }
         if( xml == null ) {
             return null;
         }
@@ -86,7 +95,7 @@ public class SCEImage extends AbstractImageSupport {
         for( int i=0; i<items.getLength(); i++ ) {
             Node item = items.item(i);
 
-            MachineImage img = toMachineImage(ctx, item);
+            MachineImage img = toMachineImage(ctx, item, false);
 
             if( img != null ) {
                 return img;
@@ -136,7 +145,7 @@ public class SCEImage extends AbstractImageSupport {
         for( int i=0; i<items.getLength(); i++ ) {
             Node item = items.item(i);
 
-            MachineImage img = toMachineImage(ctx, item);
+            MachineImage img = toMachineImage(ctx, item, false);
 
             if( img != null ) {
                 if( task != null ) {
@@ -258,7 +267,7 @@ public class SCEImage extends AbstractImageSupport {
         for( int i=0; i<items.getLength(); i++ ) {
             Node item = items.item(i);
 
-            MachineImage img = toMachineImage(ctx, item);
+            MachineImage img = toMachineImage(ctx, item, true);
 
             if( img != null && (options == null || options.matches(img)) ) {
                 images.add(img);
@@ -313,7 +322,36 @@ public class SCEImage extends AbstractImageSupport {
 
     @Override
     public @Nonnull Iterable<MachineImage> searchPublicImages(@Nonnull ImageFilterOptions options) throws CloudException, InternalException {
-        return listImages(options);
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        ImageClass cls = options.getImageClass();
+
+        if( cls != null && !cls.equals(ImageClass.MACHINE) ) {
+            return Collections.emptyList();
+        }
+        SCEMethod method = new SCEMethod(provider);
+
+        Document xml = method.getAsXML("/offerings/image");
+
+        if( xml == null ) {
+            return Collections.emptyList();
+        }
+        NodeList items = xml.getElementsByTagName("Image");
+        ArrayList<MachineImage> images = new ArrayList<MachineImage>();
+
+        for( int i=0; i<items.getLength(); i++ ) {
+            Node item = items.item(i);
+
+            MachineImage img = toMachineImage(ctx, item, false);
+
+            if( img != null && options.matches(img) ) {
+                images.add(img);
+            }
+        }
+        return images;
     }
 
     @Override
@@ -351,77 +389,85 @@ public class SCEImage extends AbstractImageSupport {
         return new String[0];
     }
 
-    private @Nullable MachineImage toMachineImage(@Nonnull ProviderContext ctx, @Nullable Node node) throws CloudException, InternalException {
+    private @Nullable MachineImage toMachineImage(@Nonnull ProviderContext ctx, @Nullable Node node, boolean mine) throws CloudException, InternalException {
         if( node == null || !node.hasChildNodes() ) {
             return null;
         }
         NodeList attributes = node.getChildNodes();
-        MachineImage img = new MachineImage();
+        Platform platform = Platform.UNKNOWN;
+        MachineImageState state = MachineImageState.PENDING;
+        String name = null, description = null;
+        String imageId = null, ownerId = null;
+        String regionId = null;
+        Architecture architecture = null;
 
-        img.setPlatform(Platform.UNKNOWN);
-        img.setSoftware("");
-        img.setType(MachineImageType.VOLUME);
-        img.setCurrentState(MachineImageState.PENDING);
-        img.setImageClass(ImageClass.MACHINE);
         for( int i=0; i<attributes.getLength(); i++ ) {
             Node attr = attributes.item(i);
             String nodeName = attr.getNodeName();
 
             if( nodeName.equalsIgnoreCase("ID") && attr.hasChildNodes() ) {
-                img.setProviderMachineImageId(attr.getFirstChild().getNodeValue().trim());
+                imageId = attr.getFirstChild().getNodeValue().trim();
             }
             else if( nodeName.equalsIgnoreCase("Name") && attr.hasChildNodes() ) {
-                img.setName(attr.getFirstChild().getNodeValue().trim());
+                name = attr.getFirstChild().getNodeValue().trim();
             }
             else if( nodeName.equalsIgnoreCase("Description") && attr.hasChildNodes() ) {
-                img.setDescription(attr.getFirstChild().getNodeValue().trim());
+                description = attr.getFirstChild().getNodeValue().trim();
             }
             else if( nodeName.equalsIgnoreCase("Location") && attr.hasChildNodes() ) {
-                img.setProviderRegionId(attr.getFirstChild().getNodeValue().trim());
+                regionId = attr.getFirstChild().getNodeValue().trim();
             }
             else if( nodeName.equalsIgnoreCase("State") && attr.hasChildNodes() ) {
                 String status = attr.getFirstChild().getNodeValue().trim();
 
-                img.setCurrentState(toMachineImageState(status));
+                state = toMachineImageState(status);
             }
             else if( nodeName.equalsIgnoreCase("Owner") && attr.hasChildNodes() ) {
-                img.setProviderOwnerId(attr.getFirstChild().getNodeValue().trim());
+                ownerId = attr.getFirstChild().getNodeValue().trim();
             }
             else if( nodeName.equalsIgnoreCase("Platform") && attr.hasChildNodes() ) {
                 String p = attr.getFirstChild().getNodeValue().trim();
 
-                img.setPlatform(toPlatform(p));
+                platform = toPlatform(p);
+                if( platform == null ) {
+                    platform = Platform.UNKNOWN;
+                }
             }
             else if( nodeName.equalsIgnoreCase("Architecture") && attr.hasChildNodes() ) {
                 String a = attr.getFirstChild().getNodeValue().trim();
 
-                img.setArchitecture(toArchitecture(a));
+                architecture = toArchitecture(a);
             }
             else if( nodeName.equalsIgnoreCase("CreatedTime") && attr.hasChildNodes() ) {
                 // will eventually support created time
             }
         }
-        if( img.getProviderMachineImageId() == null ) {
+        if( imageId == null || regionId == null || !regionId.equals(ctx.getRegionId()) ) {
             return null;
         }
-        String regionId = img.getProviderRegionId();
-
-        if( regionId == null ) {
+        if( mine && (ownerId == null || !ownerId.equals(ctx.getAccountNumber())) ) {
             return null;
         }
-        if( !regionId.equals(ctx.getRegionId()) ) {
-            return null;
+        if( Platform.UNKNOWN.equals(platform) ) {
+            if( name != null ) {
+                if( description != null ) {
+                    platform = Platform.guess(name + " " + description);
+                }
+                else {
+                    platform = Platform.guess(name);
+                }
+            }
+            else if( description != null ) {
+                platform = Platform.guess(description);
+            }
         }
-        if( img.getName() == null ) {
-            img.setName(img.getProviderMachineImageId());
+        if( name == null ) {
+            name = imageId + " [" + platform + "]";
         }
-        if( img.getDescription() == null ) {
-            img.setDescription(img.getName() + " [#" + img.getProviderMachineImageId() + "]");
+        if( description == null ) {
+            description = name;
         }
-        if( img.getPlatform() == null || img.getPlatform().equals(Platform.UNKNOWN) ) {
-            img.setPlatform(toPlatform(img.getName() + " " + img.getDescription()));
-        }
-        return img;
+        return MachineImage.getMachineImageInstance(ownerId, regionId, imageId, state, name, description, architecture, platform, MachineImageFormat.VHD);
     }
 
     private @Nonnull Platform toPlatform(@Nonnull String p) {
