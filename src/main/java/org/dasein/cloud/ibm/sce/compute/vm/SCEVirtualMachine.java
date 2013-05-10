@@ -831,8 +831,8 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
                     }
                     tmp[tmp.length-1] = ip;
                     addrs = tmp;
-                }
-                vm.setPublicIpAddresses(addrs);
+                    vm.setPublicIpAddresses(addrs);
+                }    
             }
             else if( nodeName.equalsIgnoreCase("ImageID") && attr.hasChildNodes() ) {
                 vm.setProviderMachineImageId(attr.getFirstChild().getNodeValue().trim());
