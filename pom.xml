@@ -247,7 +247,7 @@
 
                     </systemProperties>
                     <includes>
-                      <!-- <include>**/SCETestSuite.java</include> -->
+                      <include>**/SCETestSuite.java</include>
                     </includes>
                 </configuration>
             </plugin>

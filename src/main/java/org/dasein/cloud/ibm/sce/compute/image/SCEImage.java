@@ -517,7 +517,44 @@ public class SCEImage implements MachineImageSupport {
 
     @Override
     public @Nonnull Iterable<MachineImage> searchPublicImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
-        return searchImages(null, keyword, platform, architecture, imageClasses);
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new SCEConfigException("No context was configured for this request");
+        }
+        SCEMethod method = new SCEMethod(provider);
+
+        Document xml = method.getAsXML("/offerings/image");
+
+        if( xml == null ) {
+            return Collections.emptyList();
+        }
+        NodeList items = xml.getElementsByTagName("Image");
+        ArrayList<MachineImage> images = new ArrayList<MachineImage>();
+
+        for( int i=0; i<items.getLength(); i++ ) {
+            Node item = items.item(i);
+
+            MachineImage img = toMachineImage(ctx, item, null, keyword, platform, architecture);
+
+            if( img != null ) {
+                if( imageClasses != null && imageClasses.length > 0 ) {
+                    boolean contained = false;
+
+                    for( ImageClass cls : imageClasses ) {
+                        if( cls.equals(img.getImageClass()) ) {
+                            contained = true;
+                            break;
+                        }
+                    }
+                    if( !contained ) {
+                        continue;
+                    }
+                }
+                images.add(img);
+            }
+        }
+        return images;
     }
 
     @Override
