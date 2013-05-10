@@ -752,27 +752,22 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
         NodeList attrs = ipNode.getChildNodes();
         String address = null;
 
-        for( int j=0; j<attrs.getLength(); j++ ) {
-            Node attr= attrs.item(j);
-            String n = attr.getNodeName();
-
-            if( n.equalsIgnoreCase("Address") && attr.hasChildNodes() ) {
-                NodeList items = attr.getChildNodes();
-
-                for( int k=0; k<items.getLength(); k++ ) {
-                    Node item = items.item(k);
-
-                    if( item.getNodeName().equalsIgnoreCase("IP") && item.hasChildNodes() ) {
-                        address = item.getFirstChild().getNodeValue().trim();
-                    }
-                }
-            }
-        }
+		for( int j=0; j<attrs.getLength(); j++ ) {
+			Node attr= attrs.item(j);
+			if( attr.getNodeName().equalsIgnoreCase("IP") && attr.hasChildNodes() ) {
+				address = attr.getFirstChild().getNodeValue().trim();
+				for (String currentIp : current) {
+					if (currentIp.equals(address)) {
+						address = null;
+					}
+				}
+			}
+		}
         if( address == null ) {
             return (current == null ? new String[0] : current);
         }
 
-        String[] addresses = new String[current == null ? 1 : current.length];
+        String[] addresses = new String[current == null ? 1 : current.length+1];
         int i = 0;
 
         if( current != null ) {
@@ -835,8 +830,8 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
                     }
                     tmp[tmp.length-1] = ip;
                     addrs = tmp;
+                    vm.setPublicIpAddresses(addrs);
                 }
-                vm.setPublicIpAddresses(addrs);
             }
             else if( nodeName.equalsIgnoreCase("ImageID") && attr.hasChildNodes() ) {
                 vm.setProviderMachineImageId(attr.getFirstChild().getNodeValue().trim());
