@@ -475,6 +475,9 @@ public class SCEImage implements MachineImageSupport {
 
     @Override
     public @Nonnull Iterable<MachineImage> searchImages(@Nullable String accountNumber, @Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
+        if( accountNumber == null ) {
+            return searchPublicImages(keyword, platform, architecture, imageClasses);
+        }
         if( imageClasses != null ) {
             boolean ok = false;
 
@@ -517,6 +520,7 @@ public class SCEImage implements MachineImageSupport {
 
     @Override
     public @Nonnull Iterable<MachineImage> searchPublicImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
+        System.out.println("Searching public images: " + keyword + "/" + platform + "/" + architecture);
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -554,6 +558,7 @@ public class SCEImage implements MachineImageSupport {
                 images.add(img);
             }
         }
+        System.out.println("Got: " + images);
         return images;
     }
 
@@ -590,7 +595,7 @@ public class SCEImage implements MachineImageSupport {
 
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return true;
+        return ImageClass.MACHINE.equals(cls);
     }
 
     @Override
