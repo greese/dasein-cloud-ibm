@@ -138,7 +138,7 @@ public class Locations implements DataCenterServices {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/locations");
+        Document xml = method.getAsXML("locations");
 
         if( xml == null ) {
             return Collections.emptyList();
