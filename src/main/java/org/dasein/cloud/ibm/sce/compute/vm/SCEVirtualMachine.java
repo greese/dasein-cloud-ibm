@@ -193,8 +193,20 @@ public class SCEVirtualMachine extends AbstractVMSupport {
     }
 
     @Override
+    public @Nonnull Requirement identifyPasswordRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
+    }
+
+    @Override
     public @Nonnull Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
-        return Requirement.NONE;
+    	Requirement passRequirement;
+    	if (platform.isWindows()) {
+    		passRequirement = Requirement.REQUIRED;
+    	}
+    	else {
+    		passRequirement = Requirement.NONE;
+    	}
+        return passRequirement;
     }
 
     @Override
@@ -259,6 +271,7 @@ public class SCEVirtualMachine extends AbstractVMSupport {
 
     @Override
     public @Nonnull VirtualMachine launch(@Nonnull VMLaunchOptions withLaunchOptions) throws CloudException, InternalException {
+    	Logger logger = SCE.getLogger(SCEVirtualMachine.class, "launch");
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -271,13 +284,29 @@ public class SCEVirtualMachine extends AbstractVMSupport {
         parameters.add(new BasicNameValuePair("instanceType", withLaunchOptions.getStandardProductId()));
         parameters.add(new BasicNameValuePair("imageID", withLaunchOptions.getMachineImageId()));
         parameters.add(new BasicNameValuePair("location", ctx.getRegionId()));
-        if( keypair == null ) {
-            keypair = identifyKeypair();
+        MachineImage launchImage = provider.getComputeServices().getImageSupport().getImage(withLaunchOptions.getMachineImageId());
+        if (launchImage.getPlatform().isUnix()) {
+            if( keypair == null ) {
+                keypair = identifyKeypair();
+            }
+            parameters.add(new BasicNameValuePair("publicKey", keypair));
         }
-        parameters.add(new BasicNameValuePair("publicKey", keypair));
+        else if (launchImage.getPlatform().isWindows()) {
+            if (withLaunchOptions.getBootstrapUser() != null) {
+            	logger.debug("Adding UserName parameter: " + withLaunchOptions.getBootstrapUser());
+                parameters.add(new BasicNameValuePair("UserName", withLaunchOptions.getBootstrapUser()));
+            }
+            if (withLaunchOptions.getBootstrapPassword() != null) {
+            	logger.debug("Adding Password parameter");
+                parameters.add(new BasicNameValuePair("Password", withLaunchOptions.getBootstrapPassword()));
+            }	
+        }
+        
         if( withLaunchOptions.getVlanId() != null ) {
+        	logger.debug("Adding vlanID parameter: " + withLaunchOptions.getVlanId());
             parameters.add(new BasicNameValuePair("vlanID", withLaunchOptions.getVlanId()));
         }
+        
         String[] ips = withLaunchOptions.getStaticIpIds();
 
         if( ips.length > 0 ) {
@@ -292,6 +321,7 @@ public class SCEVirtualMachine extends AbstractVMSupport {
                 }
             }
         }
+
         String userData = withLaunchOptions.getUserData();
 
         if( userData != null ) {
@@ -330,6 +360,8 @@ public class SCEVirtualMachine extends AbstractVMSupport {
             VirtualMachine vm = toVirtualMachine(ctx, item);
 
             if( vm != null ) {
+            	vm.setRootPassword(withLaunchOptions.getBootstrapPassword());
+            	vm.setRootUser(withLaunchOptions.getBootstrapUser());
                 return vm;
             }
         }
