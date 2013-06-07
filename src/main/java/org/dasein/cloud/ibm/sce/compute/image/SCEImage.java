@@ -79,7 +79,7 @@ public class SCEImage extends AbstractImageSupport {
         Document xml;
 
         try {
-            xml = method.getAsXML("/offerings/image/" + providerImageId);
+            xml = method.getAsXML("offerings/image/" + providerImageId);
         }
         catch( CloudException whatiswrongwithIBM ) {
             // SmartCloud throws a 500 error when the image doesn't exist
@@ -166,7 +166,7 @@ public class SCEImage extends AbstractImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image/" + machineImageId);
+        Document xml = method.getAsXML("offerings/image/" + machineImageId);
 
         if( xml == null ) {
             return false;
@@ -222,7 +222,7 @@ public class SCEImage extends AbstractImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image");
+        Document xml = method.getAsXML("offerings/image");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -256,7 +256,7 @@ public class SCEImage extends AbstractImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image");
+        Document xml = method.getAsXML("offerings/image");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -311,7 +311,7 @@ public class SCEImage extends AbstractImageSupport {
 
         SCEMethod method = new SCEMethod(provider);
 
-        method.delete("/offerings/image/" + providerImageId);
+        method.delete("offerings/image/" + providerImageId);
     }
 
     @Override
@@ -327,6 +327,7 @@ public class SCEImage extends AbstractImageSupport {
         if( ctx == null ) {
             throw new SCEConfigException("No context was configured for this request");
         }
+
         ImageClass cls = options.getImageClass();
 
         if( cls != null && !cls.equals(ImageClass.MACHINE) ) {
@@ -334,7 +335,7 @@ public class SCEImage extends AbstractImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image");
+        Document xml = method.getAsXML("offerings/image");
 
         if( xml == null ) {
             return Collections.emptyList();
