@@ -125,7 +125,7 @@ public class SCEImage implements MachineImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image/" + providerImageId);
+        Document xml = method.getAsXML("offerings/image/" + providerImageId);
 
         if( xml == null ) {
             return null;
@@ -245,7 +245,7 @@ public class SCEImage implements MachineImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image/" + machineImageId);
+        Document xml = method.getAsXML("offerings/image/" + machineImageId);
 
         if( xml == null ) {
             return false;
@@ -301,7 +301,7 @@ public class SCEImage implements MachineImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image");
+        Document xml = method.getAsXML("offerings/image");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -330,7 +330,7 @@ public class SCEImage implements MachineImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image");
+        Document xml = method.getAsXML("offerings/image");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -362,7 +362,7 @@ public class SCEImage implements MachineImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image");
+        Document xml = method.getAsXML("offerings/image");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -449,7 +449,7 @@ public class SCEImage implements MachineImageSupport {
 
         SCEMethod method = new SCEMethod(provider);
 
-        method.delete("/offerings/image/" + providerImageId);
+        method.delete("offerings/image/" + providerImageId);
     }
 
     @Override
@@ -498,7 +498,7 @@ public class SCEImage implements MachineImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image");
+        Document xml = method.getAsXML("offerings/image");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -528,7 +528,7 @@ public class SCEImage implements MachineImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/image");
+        Document xml = method.getAsXML("offerings/image");
 
         if( xml == null ) {
             return Collections.emptyList();
