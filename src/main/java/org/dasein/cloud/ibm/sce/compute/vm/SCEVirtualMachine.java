@@ -291,14 +291,15 @@ public class SCEVirtualMachine extends AbstractVMSupport {
             }
             parameters.add(new BasicNameValuePair("publicKey", keypair));
         }
-        
-        if (withLaunchOptions.getBootstrapUser() != null) {
-        	logger.debug("Adding UserName parameter: " + withLaunchOptions.getBootstrapUser());
-            parameters.add(new BasicNameValuePair("UserName", withLaunchOptions.getBootstrapUser()));
-        }
-        if (withLaunchOptions.getBootstrapPassword() != null) {
-        	logger.debug("Adding Password parameter");
-            parameters.add(new BasicNameValuePair("Password", withLaunchOptions.getBootstrapPassword()));
+        else if (launchImage.getPlatform().isWindows()) {
+            if (withLaunchOptions.getBootstrapUser() != null) {
+            	logger.debug("Adding UserName parameter: " + withLaunchOptions.getBootstrapUser());
+                parameters.add(new BasicNameValuePair("UserName", withLaunchOptions.getBootstrapUser()));
+            }
+            if (withLaunchOptions.getBootstrapPassword() != null) {
+            	logger.debug("Adding Password parameter");
+                parameters.add(new BasicNameValuePair("Password", withLaunchOptions.getBootstrapPassword()));
+            }	
         }
         
         if( withLaunchOptions.getVlanId() != null ) {
