@@ -134,7 +134,7 @@ public class SCE extends AbstractCloud {
                     logger.error("No context was specified for a context test");
                     return null;
                 }
-                if( method.getAsXML("/locations") == null ) {
+                if( method.getAsXML("locations") == null ) {
                     logger.warn("Account number was invalid for context test: " + ctx.getAccountNumber());
                     return null;
                 }
