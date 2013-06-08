@@ -87,7 +87,7 @@ public class SCEStaticIP implements IpAddressSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/addresses");
+        Document xml = method.getAsXML("addresses");
 
         if( xml == null ) {
             return null;
@@ -195,7 +195,7 @@ public class SCEStaticIP implements IpAddressSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/offerings/address");
+        Document xml = method.getAsXML("offerings/address");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -241,7 +241,7 @@ public class SCEStaticIP implements IpAddressSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/addresses");
+        Document xml = method.getAsXML("addresses");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -273,7 +273,7 @@ public class SCEStaticIP implements IpAddressSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/addresses");
+        Document xml = method.getAsXML("addresses");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -318,7 +318,7 @@ public class SCEStaticIP implements IpAddressSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/addresses");
+        Document xml = method.getAsXML("addresses");
 
         if( xml == null ) {
             return Collections.emptyList();
@@ -366,7 +366,7 @@ public class SCEStaticIP implements IpAddressSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        method.delete("/addresses/" + addressId);
+        method.delete("addresses/" + addressId);
     }
 
     @Override
