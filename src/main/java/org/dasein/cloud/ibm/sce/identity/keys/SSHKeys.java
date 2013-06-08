@@ -107,7 +107,7 @@ public class SSHKeys implements ShellKeySupport {
 
         SCEMethod method = new SCEMethod(provider);
 
-        method.delete("/keys/" + providerId);
+        method.delete("keys/" + providerId);
     }
 
     @Override
@@ -131,7 +131,7 @@ public class SSHKeys implements ShellKeySupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/keys/" + providerId);
+        Document xml = method.getAsXML("keys/" + providerId);
 
         if( xml == null ) {
             return null;
@@ -189,7 +189,7 @@ public class SSHKeys implements ShellKeySupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("/keys");
+        Document xml = method.getAsXML("keys");
 
         if( xml == null ) {
             return Collections.emptyList();
