@@ -634,7 +634,7 @@ public class SCEVirtualMachine extends AbstractVMSupport {
         return new String[0];
     }
 
-    private @Nonnull String[] parseAddress(@Nullable String[] current, @Nonnull Node ipNode) {
+    private @Nonnull String parseAddress(@Nonnull Node ipNode) {
         NodeList attrs = ipNode.getChildNodes();
         String address = null;
 
@@ -642,14 +642,20 @@ public class SCEVirtualMachine extends AbstractVMSupport {
 			Node attr= attrs.item(j);
 			if( attr.getNodeName().equalsIgnoreCase("IP") && attr.hasChildNodes() ) {
 				address = attr.getFirstChild().getNodeValue().trim();
-				for (String currentIp : current) {
-					if (currentIp.equals(address)) {
-						address = null;
-					}
-				}
 			}
 
 		}
+        return address;
+    }
+
+    private @Nonnull String[] addAddress(@Nullable String[] current, @Nonnull String ipAddress) {
+        String address = ipAddress;
+        for (String currentIp : current) {
+            if (currentIp.equals(address)) {
+                address = null;
+            }
+        }
+
         if( address == null ) {
             return (current == null ? new String[0] : current);
         }
@@ -703,10 +709,22 @@ public class SCEVirtualMachine extends AbstractVMSupport {
             }
             else if( nodeName.equalsIgnoreCase("IP") && attr.hasChildNodes() ) {
                 String ip = attr.getFirstChild().getNodeValue().trim();
-                String[] addrs = vm.getPublicIpAddresses();
+                boolean isPublic = isPublicIpAddress(ip);
+                String[] addrs;
+                if (isPublic) {
+                    addrs = vm.getPublicIpAddresses();
+                }
+                else {
+                    addrs = vm.getPrivateIpAddresses();
+                }
 
                 if( addrs == null || addrs.length == 0 ) {
-                    vm.setPublicIpAddresses(new String[]{ ip });
+                    if (isPublic) {
+                        vm.setPublicIpAddresses(new String[]{ ip });
+                    }
+                    else {
+                        vm.setPrivateIpAddresses(new String[]{ ip });
+                    }
                 }
                 else {
                     String[] tmp = new String[addrs.length + 1];
@@ -717,7 +735,12 @@ public class SCEVirtualMachine extends AbstractVMSupport {
                     }
                     tmp[tmp.length-1] = ip;
                     addrs = tmp;
-                    vm.setPublicIpAddresses(addrs);
+                    if (isPublic) {
+                        vm.setPublicIpAddresses(addrs);
+                    }
+                    else {
+                        vm.setPrivateIpAddresses(addrs);
+                    }
                 }
             }
             else if( nodeName.equalsIgnoreCase("ImageID") && attr.hasChildNodes() ) {
@@ -738,10 +761,24 @@ public class SCEVirtualMachine extends AbstractVMSupport {
                 // what exactly is expiration time?
             }
             else if( nodeName.equalsIgnoreCase("PrimaryIP") && attr.hasChildNodes() ) {
-                vm.setPublicIpAddresses(parseAddress(vm.getPublicIpAddresses(), attr));
+                String ipAddress = parseAddress(attr);
+                boolean isPublic = isPublicIpAddress(ipAddress);
+                if (isPublic) {
+                    vm.setPublicIpAddresses(addAddress(vm.getPublicIpAddresses(), ipAddress));
+                }
+                else {
+                    vm.setPrivateIpAddresses(addAddress(vm.getPrivateIpAddresses(), ipAddress));
+                }
             }
             else if( nodeName.equalsIgnoreCase("SecondaryIP") && attr.hasChildNodes() ) {
-                vm.setPublicIpAddresses(parseAddress(vm.getPublicIpAddresses(), attr));
+                String ipAddress = parseAddress(attr);
+                boolean isPublic = isPublicIpAddress(ipAddress);
+                if (isPublic) {
+                    vm.setPublicIpAddresses(addAddress(vm.getPublicIpAddresses(), ipAddress));
+                }
+                else {
+                    vm.setPrivateIpAddresses(addAddress(vm.getPrivateIpAddresses(), ipAddress));
+                }
             }
             else if( nodeName.equalsIgnoreCase("Volume") && attr.hasChildNodes() ) {
                 // volume
@@ -800,6 +837,25 @@ public class SCEVirtualMachine extends AbstractVMSupport {
         vm.setProviderDataCenterId(vm.getProviderRegionId());
         vm.setLastBootTimestamp(vm.getCreationTimestamp());
         return vm;
+    }
+
+    private boolean isPublicIpAddress(String ipv4Address) {
+        if( ipv4Address.startsWith("10.") || ipv4Address.startsWith("192.168") || ipv4Address.startsWith("169.254") ) {
+            return false;
+        }
+        else if( ipv4Address.startsWith("172.") ) {
+            String[] parts = ipv4Address.split("\\.");
+
+            if( parts.length != 4 ) {
+                return true;
+            }
+            int x = Integer.parseInt(parts[1]);
+
+            if( x >= 16 && x <= 31 ) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private @Nonnull VmState toVmState(@Nonnull String vmState) throws InternalException {
