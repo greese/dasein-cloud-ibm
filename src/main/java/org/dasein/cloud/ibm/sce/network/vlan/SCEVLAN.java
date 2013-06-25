@@ -473,6 +473,9 @@ public class SCEVLAN extends AbstractVLANSupport {
         if( vlan.getDescription() == null ) {
             vlan.setDescription(vlan.getName() + " [#" + vlan.getProviderVlanId() + "]");
         }
+        if( vlan.getCidr() == null) {
+            vlan.setCidr("0.0.0.0/0");
+        }
         return vlan;
     }
 
