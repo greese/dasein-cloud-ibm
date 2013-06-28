@@ -981,6 +981,9 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
 	}
 
     private boolean isPublicIpAddress(String ipv4Address) {
+        if (ipv4Address == null || ipv4Address.isEmpty())  {
+            return false;
+        }
         if( ipv4Address.startsWith("10.") || ipv4Address.startsWith("192.168") || ipv4Address.startsWith("169.254") ) {
             return false;
         }
