@@ -125,7 +125,17 @@ public class SCEImage implements MachineImageSupport {
         }
         SCEMethod method = new SCEMethod(provider);
 
-        Document xml = method.getAsXML("offerings/image/" + providerImageId);
+        Document xml;
+
+        try {
+            xml = method.getAsXML("offerings/image/" + providerImageId);
+        }
+        catch( CloudException whatiswrongwithIBM ) {
+            // SmartCloud throws a 500 error when the image doesn't exist
+            // Seriously
+            // I want to say a lot of very bad words here
+            return null;
+        }
 
         if( xml == null ) {
             return null;
