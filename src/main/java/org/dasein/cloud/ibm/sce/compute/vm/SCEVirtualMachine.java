@@ -66,6 +66,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 
 /**
  * Implementation of the Dasein Cloud virtual machine support for IBM SmartCloud.
@@ -279,6 +280,7 @@ public class SCEVirtualMachine extends AbstractVMSupport {
         }
         ArrayList<NameValuePair> parameters = new ArrayList<NameValuePair>();
         String keypair = withLaunchOptions.getBootstrapKey();
+        String password = null;
 
         parameters.add(new BasicNameValuePair("name", withLaunchOptions.getHostName()));
         parameters.add(new BasicNameValuePair("instanceType", withLaunchOptions.getStandardProductId()));
@@ -296,10 +298,8 @@ public class SCEVirtualMachine extends AbstractVMSupport {
             	logger.debug("Adding UserName parameter: " + withLaunchOptions.getBootstrapUser());
                 parameters.add(new BasicNameValuePair("UserName", withLaunchOptions.getBootstrapUser()));
             }
-            if (withLaunchOptions.getBootstrapPassword() != null) {
-            	logger.debug("Adding Password parameter");
-                parameters.add(new BasicNameValuePair("Password", withLaunchOptions.getBootstrapPassword()));
-            }	
+            password = getRandomPassword();
+            parameters.add(new BasicNameValuePair("Password", password));
         }
         
         if( withLaunchOptions.getVlanId() != null ) {
@@ -360,7 +360,7 @@ public class SCEVirtualMachine extends AbstractVMSupport {
             VirtualMachine vm = toVirtualMachine(ctx, item);
 
             if( vm != null ) {
-            	vm.setRootPassword(withLaunchOptions.getBootstrapPassword());
+                vm.setRootPassword(password);
             	vm.setRootUser(withLaunchOptions.getBootstrapUser());
                 return vm;
             }
@@ -915,5 +915,85 @@ public class SCEVirtualMachine extends AbstractVMSupport {
         }
         return new ResourceStatus(vmId, state == null ? VmState.PENDING : state);
     }
+
+    static public String uppercaseAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    static public String lowercaseAlphabet = "abcdefghijklmnopqrstuvwxyz";
+    static public String numbers = "0123456789";
+    static public String symbols = "!$#@%^&*()-_=+[]{},.<>?/;:";
+    static public String allChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!$#@%^&*()-_=+[]{},.<>?/;:";
+    static private final Random random = new Random();
+
+    public String getRandomPassword() {
+        StringBuilder password = new StringBuilder();
+        int rnd = random.nextInt();
+        int length = 16;
+
+        if( rnd < 0 ) {
+            rnd = -rnd;
+        }
+        length = length + (rnd%8);
+        while( password.length() < 1 ) {
+            char c;
+
+            rnd = random.nextInt();
+            if( rnd < 0 ) {
+                rnd = -rnd;
+            }
+            c = (char)(rnd%255);
+            if( uppercaseAlphabet.contains(String.valueOf(c)) ) {
+                password.append(c);
+            }
+        }
+        while( password.length() < 2 ) {
+            char c;
+
+            rnd = random.nextInt();
+            if( rnd < 0 ) {
+                rnd = -rnd;
+            }
+            c = (char)(rnd%255);
+            if( lowercaseAlphabet.contains(String.valueOf(c)) ) {
+                password.append(c);
+            }
+        }
+        while( password.length() < 3 ) {
+            char c;
+
+            rnd = random.nextInt();
+            if( rnd < 0 ) {
+                rnd = -rnd;
+            }
+            c = (char)(rnd%255);
+            if( numbers.contains(String.valueOf(c)) ) {
+                password.append(c);
+            }
+        }
+        while( password.length() < 4 ) {
+            char c;
+
+            rnd = random.nextInt();
+            if( rnd < 0 ) {
+                rnd = -rnd;
+            }
+            c = (char)(rnd%255);
+            if( symbols.contains(String.valueOf(c)) ) {
+                password.append(c);
+            }
+        }
+        while( password.length() < length ) {
+            char c;
+
+            rnd = random.nextInt();
+            if( rnd < 0 ) {
+                rnd = -rnd;
+            }
+            c = (char)(rnd%255);
+            if( allChars.contains(String.valueOf(c)) ) {
+                password.append(c);
+            }
+        }
+        return password.toString();
+    }
+
 
 }
