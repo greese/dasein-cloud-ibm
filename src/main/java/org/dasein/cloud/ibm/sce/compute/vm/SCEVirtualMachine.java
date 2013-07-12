@@ -605,7 +605,7 @@ public class SCEVirtualMachine extends AbstractVMSupport {
     }
 
     @Override
-    public void terminate(final @Nonnull String vmId) throws InternalException, CloudException {
+    public void terminate(@Nonnull String vmId, @Nullable String explanation) throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
