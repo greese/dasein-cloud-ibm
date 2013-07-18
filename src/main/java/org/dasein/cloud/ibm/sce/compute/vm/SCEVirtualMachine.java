@@ -361,7 +361,7 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
 				logger.debug("Adding UserName parameter: " + withLaunchOptions.getBootstrapUser());
 				parameters.add(new BasicNameValuePair("UserName", withLaunchOptions.getBootstrapUser()));
 			}
-            password = getRandomPassword();
+            password = getRandomPassword(withLaunchOptions.getBootstrapUser());
 			parameters.add(new BasicNameValuePair("Password", password));
 		}
 
@@ -1064,8 +1064,13 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
     static public String allChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!$#@%^&*()-_=+[]{},.<>?/;:";
     static private final Random random = new Random();
 
-    public String getRandomPassword() {
+    public String getRandomPassword(String username) {
         StringBuilder password = new StringBuilder();
+        ArrayList<String> invalidSubstrings = new ArrayList<String>();
+        final String[] invalidStrings = {username, "admin", "Administrator", "idcadmin"};
+        for (String invalidString : invalidStrings) {
+            invalidSubstrings.addAll(generateThreeCharSubstrings(invalidString));
+        }
         int rnd = random.nextInt();
         int length = 16;
 
@@ -1132,8 +1137,24 @@ public class SCEVirtualMachine implements VirtualMachineSupport {
             if( allChars.contains(String.valueOf(c)) ) {
                 password.append(c);
             }
+            for (String invalidSubstring : invalidSubstrings) {
+                if (password.toString().contains(invalidSubstring)) {
+                    password = password.delete(4, password.length());
+                    break;
+                }
+            }
+
         }
         return password.toString();
+    }
+
+    private ArrayList<String> generateThreeCharSubstrings(String input) {
+        ArrayList<String> substrings = new ArrayList<String>();
+        Integer length = input.length();
+        for (Integer i=0; (i+3)<=length; i++) {
+            substrings.add(input.substring(i, i+3));
+        }
+        return substrings;
     }
 
 }
