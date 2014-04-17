@@ -108,8 +108,9 @@ public class SCEMethod {
             wire.debug("POST --------------------------------------------------------> " + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpDelete method = new HttpDelete(endpoint + resource);
 
             method.addHeader("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8");
@@ -183,6 +184,9 @@ public class SCEMethod {
                 wire.debug("");
                 wire.debug("POST --------------------------------------------------------> " + endpoint + resource);
             }
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
         }
     }
 
@@ -206,8 +210,9 @@ public class SCEMethod {
             wire.debug("--------------------------------------------------------> " + uri.toASCIIString());
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpUriRequest get = new HttpGet(uri);
 
             get.addHeader("Accept", "text/xml");
@@ -302,6 +307,9 @@ public class SCEMethod {
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug("--------------------------------------------------------> " + uri.toASCIIString());
+            }
+            if (client != null) {
+                client.getConnectionManager().shutdown();
             }
         }
     }
@@ -433,8 +441,9 @@ public class SCEMethod {
             wire.debug("POST --------------------------------------------------------> " + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpPost post = new HttpPost(endpoint + resource);
 
             post.addHeader("Content-Type", "application/x-www-form-urlencoded");
@@ -548,6 +557,9 @@ public class SCEMethod {
                 wire.debug("");
                 wire.debug("POST --------------------------------------------------------> " + endpoint + resource);
             }
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
         }
     }
 
@@ -562,8 +574,9 @@ public class SCEMethod {
             wire.debug("POST --------------------------------------------------------> " + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
 
             HttpPut method = new HttpPut(endpoint + resource);
 
@@ -677,6 +690,9 @@ public class SCEMethod {
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug("POST --------------------------------------------------------> " + endpoint + resource);
+            }
+            if (client != null) {
+                client.getConnectionManager().shutdown();
             }
         }
     }
